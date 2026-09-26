@@ -45,13 +45,13 @@ case "$SOURCE_TYPE" in
     fi
   ;;
 
-  creek)
-    CREEK_REPO="https://github.com/MiCode/Xiaomi_Kernel_OpenSource"
-    CREEK_BRANCH="creek-v-oss"
-    echo "[CREEK] Cloning $CREEK_BRANCH ..."
+  kernel-org)
+    KORG_REPO="https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git"
+    KORG_BRANCH="linux-5.15.y"
+    echo "[KERNEL-ORG] Cloning $KORG_BRANCH ..."
     for attempt in 1 2 3; do
-      git clone --recursive --branch "$CREEK_BRANCH" "$CREEK_REPO" "$KERNEL_SRC" --depth=1 && break
-      echo "⚠️ Attempt $attempt failed, retrying in 30s..."
+      git clone --recursive --branch "$KORG_BRANCH" "$KORG_REPO" "$KERNEL_SRC" --depth=1 && break
+      echo "Attempt $attempt failed, retrying in 30s..."
       rm -rf "$KERNEL_SRC" && mkdir -p "$KERNEL_SRC"
       sleep 30
     done

@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# notify.sh — telegram notifications dispatcher
-# Usage: notify.sh <success|failure|check>
-# env: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, + mode-specific vars
+# notify.sh — Telegram notification dispatcher
+# Usage: notify.sh <success|variant-failure|failure|check>
+# Required env: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+# Optional env: TELEGRAM_TOPIC_ID (thread/topic ID for group topics)
 
-MODE="${1:?usage: notify.sh <success|failure|check>}"
+set -euo pipefail
+
+MODE="${1:?usage: notify.sh <success|variant-failure|failure|check>}"
 
 : "${TELEGRAM_BOT_TOKEN:?}"
 : "${TELEGRAM_CHAT_ID:?}"
@@ -14,7 +17,8 @@ _tg_msg() {
     ${TELEGRAM_TOPIC_ID:+-d message_thread_id="$TELEGRAM_TOPIC_ID"} \
     -d text="$1" \
     -d parse_mode="HTML" \
-    -d disable_web_page_preview=true
+    -d disable_web_page_preview=true \
+    > /dev/null
 }
 
 _tg_doc() {
@@ -24,153 +28,135 @@ _tg_doc() {
     -F chat_id="$TELEGRAM_CHAT_ID" \
     ${TELEGRAM_TOPIC_ID:+-F message_thread_id="$TELEGRAM_TOPIC_ID"} \
     -F document=@"$FILE" \
-    -F caption="$CAPTION"
+    -F caption="$CAPTION" \
+    > /dev/null
 }
 
+# ---------------------------------------------------------------------------
+# success — called from release.yml after a full aio build + release
+# ---------------------------------------------------------------------------
 if [ "$MODE" = "success" ]; then
-  : "${RUN_URL:?}" "${RUN_NUMBER:?}" "${START_TIME:?}"
-  : "${RELEASE_URL:-}" "${BUILD_TYPE:-stable}"
+  : "${RUN_URL:?}" "${RUN_NUMBER:?}" "${START_TIME:?}" "${SHA:?}"
 
-  SHORT_SHA="${SHA:0:9}"
+  SHORT_SHA="${SHA:0:8}"
+  COMMIT_MSG=$(git log -1 --format=%s 2>/dev/null || echo "")
   DURATION=$(( $(date +%s) - START_TIME ))
   DATE_STR=$(date -u +'%Y-%m-%d')
 
-  # Escape + in tag so curl form-encoding doesn't turn it into a space
-  DISPLAY_TAG=$(printf '%s' "${RELEASE_TAG}" | sed 's/+/%2B/g')
-  DISPLAY_SUSFS=$(printf '%s' "${SUSFS_VERSION}" | sed 's/+/%2B/g')
+  BUILD_LABEL="Stable"
+  [ "${BUILD_TYPE:-stable}" = "testing" ] && BUILD_LABEL="Testing"
 
-  UNAME_STR="${KERNEL_UNAME:-${KERNEL_VERSION:-unknown}}"
+  # URL-encode + in tag (form-encoding turns it into space otherwise)
+  DISPLAY_TAG=$(printf '%s' "${RELEASE_TAG:-}" | sed 's/+/%2B/g')
+  DISPLAY_SUSFS=$(printf '%s' "${SUSFS_VERSION:-}" | sed 's/+/%2B/g')
 
-  [ "$BUILD_TYPE" = "testing" ] && { ICON="🧪"; LABEL="Testing Build"; } \
-    || { ICON="🎉"; LABEL="Stable Build"; }
+  RELEASE_LINK="${RELEASE_URL:-https://github.com/${GITHUB_REPOSITORY}/releases}"
 
-  MSG="<b>${ICON} ${LABEL}</b>%0A%0A"
-  MSG="${MSG}<b>🔄</b> Run #${RUN_NUMBER} · sapphire%0A"
-  MSG="${MSG}<b>🏷️</b> <code>${DISPLAY_TAG}</code>%0A"
-  # aio releases bundle GKI + CLO, which pin different sublevels — show both bases
-  # when we have them, fall back to the single collapsed one otherwise (compat, or
-  # KERNEL_UNAME_GKI/CLO not passed in).
-  if [ -n "${KERNEL_UNAME_GKI:-}" ] && [ -n "${KERNEL_UNAME_CLO:-}" ]; then
-    MSG="${MSG}<b>🐧</b> GKI <code>${KERNEL_UNAME_GKI}</code>%0A"
-    MSG="${MSG}<b>🐧</b> CLO <code>${KERNEL_UNAME_CLO}</code>%0A"
+  # Commit line — message if non-empty, else just the hash
+  if [ -n "$COMMIT_MSG" ]; then
+    COMMIT_LINE="<a href='https://github.com/${GITHUB_REPOSITORY}/commit/${SHA}'>${SHORT_SHA}</a> — ${COMMIT_MSG}"
   else
-    MSG="${MSG}<b>🐧</b> <code>${UNAME_STR}</code>%0A"
+    COMMIT_LINE="<a href='https://github.com/${GITHUB_REPOSITORY}/commit/${SHA}'>${SHORT_SHA}</a>"
   fi
-  MSG="${MSG}<b>⏱️</b> $((DURATION/60))m $((DURATION%60))s%0A"
-  MSG="${MSG}<b>🔨</b> <a href='https://github.com/${GITHUB_REPOSITORY}/commit/${SHA}'>${SHORT_SHA}</a>%0A%0A"
 
-  MSG="${MSG}<b>📦 KSU / SUSFS</b>%0A"
-  MSG="${MSG}• KSU-Next: <code>${KSUN_TAG}</code>%0A"
-  MSG="${MSG}• SukiSU-Ultra: <code>${SUKI_TAG}</code>%0A"
-  MSG="${MSG}• SUSFS module: <code>${DISPLAY_SUSFS}</code>%0A%0A"
+  # Branch + actor
+  BRANCH_LINE="${GITHUB_REF_NAME:-unknown} · ${GITHUB_ACTOR:-yurika-sudo}"
 
-  MSG="${MSG}<b>📋</b> Run #${RUN_NUMBER} · ${DATE_STR} · ${BUILD_TYPE}%0A"
-  MSG="${MSG}<b>📦</b> ${ZIP_MODE:-per-variant} · GKI/CLO × Next/SukiSU/NoKSU%0A"
-  MSG="${MSG}<b>🔗</b> <a href='${RELEASE_URL}'>Release</a> · <a href='${RUN_URL}'>Logs</a>"
+  MSG="<b>[${BUILD_LABEL}] Seiran Kernel</b>%0A%0A"
+  MSG="${MSG}Run: #${RUN_NUMBER}%0A"
+  MSG="${MSG}Branch: ${GITHUB_REF_NAME:-unknown}%0A"
+  MSG="${MSG}Actor: ${GITHUB_ACTOR:-yurika-sudo}%0A"
+  MSG="${MSG}Commit: <a href='https://github.com/${GITHUB_REPOSITORY}/commit/${SHA}'>${SHORT_SHA}</a>%0A"
+  [ -n "$COMMIT_MSG" ] && MSG="${MSG}Message: ${COMMIT_MSG}%0A"
+  MSG="${MSG}%0A"
+  MSG="${MSG}Duration: $((DURATION/60))m $((DURATION%60))s%0A"
+  MSG="${MSG}Date: ${DATE_STR}%0A"
+  MSG="${MSG}Tag: <code>${DISPLAY_TAG}</code>%0A"
+  MSG="${MSG}%0A"
+  MSG="${MSG}KSU-Next: <code>${KSUN_TAG:-unknown}</code>%0A"
+  MSG="${MSG}ReSukiSU: <code>${RSKU_TAG:-unknown}</code>%0A"
+  MSG="${MSG}SUSFS: <code>${DISPLAY_SUSFS}</code>%0A"
+  MSG="${MSG}%0A"
+  MSG="${MSG}<a href='${RELEASE_LINK}'>Release</a>%0A"
+  MSG="${MSG}<a href='${RUN_URL}'>Logs</a>"
+
   _tg_msg "$MSG"
 
-  # Send ZIPs
+  # Attach per-variant ZIPs
   for ZIP in ./release_zips/*.zip; do
     [ -f "$ZIP" ] || continue
-    SIZE_MB=$(echo "scale=2; $(stat -c%s "$ZIP") / 1024 / 1024" | bc | sed 's/^\./0./')
-    _tg_doc "$ZIP" "📦 $(basename "$ZIP") — ${SIZE_MB} MB"
+    SIZE_MB=$(echo "scale=1; $(stat -c%s "$ZIP") / 1048576" | bc | sed 's/^\./0./')
+    _tg_doc "$ZIP" "$(basename "$ZIP") — ${SIZE_MB} MB"
   done
 
-  # Send audit log
-  if [ -n "$LOG_AUDIT_ZIP" ] && [ -f "$LOG_AUDIT_ZIP" ]; then
-    if (( $(echo "$LOG_AUDIT_SIZE_MB < 45" | bc -l) )); then
-      _tg_doc "$LOG_AUDIT_ZIP" "📋 $(basename "$LOG_AUDIT_ZIP") — ${LOG_AUDIT_SIZE_MB} MB"
-    else
-      _tg_msg "📋 Log too large (${LOG_AUDIT_SIZE_MB} MB) — grab from <a href='${RELEASE_URL}'>release</a>."
-    fi
-  fi
-
-elif [ "$MODE" = "failure" ]; then
-  : "${RUN_URL:?}" "${RUN_NUMBER:?}"
-  STATUS="${BUILD_STATUS:-failed}"
-  [ "$STATUS" = "cancelled" ] && ICON="⚠️" && LABEL="Cancelled" \
-    || ICON="❌" && LABEL="Build Failed"
-
-  MSG="<b>${ICON} ${LABEL}</b>%0A%0A"
-  MSG="${MSG}<b>🔄</b> Run #${RUN_NUMBER} · sapphire%0A"
-  MSG="${MSG}<b>🕐</b> $(date -u +'%Y-%m-%d %H:%M UTC')%0A"
-  MSG="${MSG}<b>🔗</b> <a href='${RUN_URL}'>Logs</a>"
-  _tg_msg "$MSG"
-
-elif [ "$MODE" = "check" ]; then
-  : "${RUN_URL:?}"
-
-  # Escape + so curl form-encoding doesn't turn it into a space
-  DISPLAY_SUSFS_TAG=$(printf '%s' "${CHECK_SUSFS_TAG:-?}" | sed 's/+/%2B/g')
-
-  # Status header
-  if [ "${HAS_UPDATE:-false}" = "true" ]; then
-    STATUS_LINE="<b>🆕 Updates available</b>"
-  else
-    STATUS_LINE="<b>✅ All sources up to date</b>"
-  fi
-
-  MSG="<b>🔍 Source Update Check</b>%0A%0A"
-  MSG="${MSG}${STATUS_LINE}%0A%0A"
-  MSG="${MSG}<b>GKI 5.15:</b>    <code>${CHECK_GKI_SUB:-?}</code>%0A"
-  MSG="${MSG}<b>CLO 5.15:</b>    <code>${CHECK_CLO_SUB:-?}</code>%0A"
-  MSG="${MSG}<b>KSU-Next:</b>    <code>${CHECK_KSUN_TAG:-?}</code>%0A"
-  MSG="${MSG}<b>SukiSU-Ultra:</b> <code>${CHECK_SUKI_TAG:-?}</code>%0A"
-  MSG="${MSG}<b>SUSFS:</b>       <code>${DISPLAY_SUSFS_TAG}</code>%0A"
-
-  # Show what changed
-  if [ "${HAS_UPDATE:-false}" = "true" ] && [ -n "${UPDATE_DETAIL:-}" ]; then
-    MSG="${MSG}%0A<b>📋 Changes:</b>%0A"
-    while IFS= read -r LINE; do
-      [ -z "$LINE" ] && continue
-      LINE_ESC=$(printf '%s' "$LINE" | sed 's/+/%2B/g')
-      MSG="${MSG}▸ ${LINE_ESC}%0A"
-    done <<< "$UPDATE_DETAIL"
-    MSG="${MSG}%0ATrigger a stable build from Actions when ready."
-  fi
-
-  MSG="${MSG}%0A%0A<b>🔗</b> <a href='${RUN_URL}'>Run details</a>"
-
-  if [ -n "${CHECK_FAILED:-}" ]; then
-    MSG="${MSG}%0A%0A<b>⚠️ Couldn't fetch this run (kept last known pin, not treated as an update):</b>%0A"
-    while IFS= read -r LINE; do
-      [ -z "$LINE" ] && continue
-      MSG="${MSG}▸ ${LINE}%0A"
-    done <<< "$CHECK_FAILED"
-  fi
-
-  _tg_msg "$MSG"
-
+# ---------------------------------------------------------------------------
+# variant-failure — called from build-kernel.yml when a single variant fails
+# ---------------------------------------------------------------------------
 elif [ "$MODE" = "variant-failure" ]; then
   : "${RUN_URL:?}" "${RUN_NUMBER:?}" "${VARIANT:?}"
 
-  # Pick log file based on source type
-  LOG_FILE="/tmp/build_${SOURCE_TYPE:-gki}.log"
+  BUILD_LABEL="Stable"
+  [ "${BUILD_TYPE:-stable}" = "testing" ] && BUILD_LABEL="Testing"
 
-  # Extract last 20 unique error lines, strip long path prefix
-  ERRORS=""
-  if [ -f "$LOG_FILE" ]; then
-    ERRORS=$(grep -E " error:" "$LOG_FILE" \
-      | sed 's|.*/kernel_src/||' \
-      | awk '!seen[$0]++' \
-      | tail -20 \
-      | head -c 1800)
-  fi
-
-  [ "$BUILD_TYPE" = "testing" ] && TYPE_ICON="🧪" || TYPE_ICON="🔨"
-
-  MSG="<b>❌ Build Failed — ${VARIANT}</b>%0A%0A"
-  MSG="${MSG}<b>${TYPE_ICON}</b> ${BUILD_TYPE:-stable} · Run #${RUN_NUMBER}%0A"
-  MSG="${MSG}<b>🕐</b> $(date -u +'%H:%M UTC')%0A"
-  MSG="${MSG}<b>🔗</b> <a href='${RUN_URL}'>Logs</a>"
-
-  if [ -n "$ERRORS" ]; then
-    MSG="${MSG}%0A%0A<b>🔍 Errors:</b>%0A<pre>${ERRORS}</pre>"
-  fi
+  MSG="<b>[${BUILD_LABEL}] Build failed — ${VARIANT}</b>%0A%0A"
+  MSG="${MSG}Run #${RUN_NUMBER} · <a href='${RUN_URL}'>Logs</a>"
 
   _tg_msg "$MSG"
 
+# ---------------------------------------------------------------------------
+# failure — called from build-aio.yml notify-failure job (cancelled run)
+# ---------------------------------------------------------------------------
+elif [ "$MODE" = "failure" ]; then
+  : "${RUN_URL:?}" "${RUN_NUMBER:?}"
+
+  BUILD_LABEL="Stable"
+  [ "${BUILD_TYPE:-stable}" = "testing" ] && BUILD_LABEL="Testing"
+
+  MSG="<b>[${BUILD_LABEL}] Build cancelled — Run #${RUN_NUMBER}</b>%0A%0A"
+  MSG="${MSG}Status: ${BUILD_STATUS:-cancelled}%0A"
+  MSG="${MSG}<a href='${RUN_URL}'>Logs</a>"
+
+  _tg_msg "$MSG"
+
+# ---------------------------------------------------------------------------
+# check — called from check-updates.yml notify job
+# ---------------------------------------------------------------------------
+elif [ "$MODE" = "check" ]; then
+  : "${RUN_URL:?}"
+
+  if [ "${CHECK_FAILED:-false}" = "true" ]; then
+    MSG="<b>[check-updates] Version fetch failed</b>%0A%0A"
+    MSG="${MSG}<a href='${RUN_URL}'>Logs</a>"
+    _tg_msg "$MSG"
+    exit 0
+  fi
+
+  if [ "${HAS_UPDATE:-false}" != "true" ]; then
+    MSG="<b>[check-updates] No upstream changes</b>%0A%0A"
+    MSG="${MSG}KSU-Next <code>${CHECK_KSUN_TAG:-?}</code> · ReSukiSU <code>${CHECK_RSKU_TAG:-?}</code> · SUSFS <code>${CHECK_SUSFS_TAG:-?}</code>%0A"
+    MSG="${MSG}GKI <code>${CHECK_GKI_SUB:-?}</code> · CLO <code>${CHECK_CLO_SUB:-?}</code>%0A%0A"
+    MSG="${MSG}<a href='${RUN_URL}'>Logs</a>"
+    _tg_msg "$MSG"
+    exit 0
+  fi
+
+  # Has update
+  MSG="<b>[check-updates] Upstream update detected</b>%0A%0A"
+  [ -n "${UPDATE_DETAIL:-}" ] && MSG="${MSG}${UPDATE_DETAIL}%0A%0A"
+  MSG="${MSG}KSU-Next <code>${CHECK_KSUN_TAG:-?}</code> · ReSukiSU <code>${CHECK_RSKU_TAG:-?}</code> · SUSFS <code>${CHECK_SUSFS_TAG:-?}</code>%0A"
+  MSG="${MSG}GKI <code>${CHECK_GKI_SUB:-?}</code> · CLO <code>${CHECK_CLO_SUB:-?}</code>%0A"
+
+  if [ -n "${HELD_BACK:-}" ]; then
+    MSG="${MSG}%0AHeld back (gate failed):%0A"
+    while IFS= read -r line; do
+      [ -n "$line" ] && MSG="${MSG}  ${line}%0A"
+    done <<< "$HELD_BACK"
+  fi
+
+  MSG="${MSG}%0A<a href='${RUN_URL}'>Logs</a>"
+  _tg_msg "$MSG"
+
 else
-  echo "[ERROR] Unknown mode: $MODE"
+  echo "notify.sh: unknown mode '$MODE'" >&2
   exit 1
 fi

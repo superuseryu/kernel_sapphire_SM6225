@@ -1,0 +1,17 @@
+name: "Build Kernel — Vanilla Test"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-kernel.yml
+    with:
+      variant_name:  "Vanilla-NoKSU"
+      source_type:   "kernel-org"
+      ksu_type:      "none"
+      zip_prefix:    "Vanilla_NoKSU"
+      artifact_name: "vanilla-noksu"
+      defconfig:     "defconfig"
+      build_type:    "testing"
+    secrets: inherit

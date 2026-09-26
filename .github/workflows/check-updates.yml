@@ -1,4 +1,4 @@
-name: "🔍 Check Source Updates"
+name: "Check Source Updates"
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -13,34 +13,138 @@ permissions:
 
 jobs:
   check:
-    name: "🔍 Check upstream versions"
+    name: "Check upstream versions"
     runs-on: ubuntu-latest
+    outputs:
+      has_update:    ${{ steps.versions.outputs.has_update }}
+      ksun_tag:      ${{ steps.versions.outputs.ksun_tag }}
+      rsku_tag:      ${{ steps.versions.outputs.rsku_tag }}
+      susfs_tag:     ${{ steps.versions.outputs.susfs_tag }}
+      gki_sub:       ${{ steps.versions.outputs.gki_sub }}
+      clo_sub:       ${{ steps.versions.outputs.clo_sub }}
+      ksun_changed:  ${{ steps.versions.outputs.ksun_changed }}
+      rsku_changed:  ${{ steps.versions.outputs.rsku_changed }}
+      update_detail: ${{ steps.versions.outputs.update_detail }}
+      check_failed:  ${{ steps.versions.outputs.check_failed }}
 
     steps:
       - uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 1
 
-      - name: "🔍 Fetch and compare upstream versions"
+      - name: "Fetch and compare upstream versions"
         id: versions
         run: bash scripts/check-sources.sh
 
-      - name: "📌 Update source-pins.json"
-        if: env.HAS_UPDATE == 'true'
+  # Build-gate: only runs when its tag actually moved. Uses GKI-KSU-Next/GKI-SukiSU-Ultra
+  # as the cheapest representative variant — goal is "does this candidate
+  # compile", not a full 6-way matrix. build_type: stable so testing/ patches
+  # don't add noise to the signal.
+  verify-ksun:
+    name: "Verify KSU-Next candidate"
+    needs: check
+    if: needs.check.outputs.ksun_changed == 'true'
+    uses: ./.github/workflows/build-kernel.yml
+    with:
+      variant_name:  "Verify-KSU-Next"
+      source_type:   gki
+      ksu_type:      ksun
+      zip_prefix:    VERIFY_KSU-Next
+      artifact_name: verify-ksun
+      defconfig:     gki_defconfig
+      build_type:    stable
+      ksun_tag_pin:  ${{ needs.check.outputs.ksun_tag }}
+    secrets: inherit
+
+  verify-rsku:
+    name: "Verify ReSukiSU candidate"
+    needs: check
+    if: needs.check.outputs.rsku_changed == 'true'
+    uses: ./.github/workflows/build-kernel.yml
+    with:
+      variant_name:  "Verify-ReSukiSU"
+      source_type:   gki
+      ksu_type:      rsku
+      zip_prefix:    VERIFY_ReSukiSU
+      artifact_name: verify-rsku
+      defconfig:     gki_defconfig
+      build_type:    stable
+      rsku_tag_pin:  ${{ needs.check.outputs.rsku_tag }}
+    secrets: inherit
+
+  apply-pins:
+    name: "Apply verified pins"
+    needs: [check, verify-ksun, verify-rsku]
+    if: always() && needs.check.outputs.has_update == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      held_back: ${{ steps.apply.outputs.held_back }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 1
+
+      - name: "Write source-pins.json (skip fields whose gate failed)"
+        id: apply
+        env:
+          NEW_KSUN:  ${{ needs.check.outputs.ksun_tag }}
+          NEW_RSKU:  ${{ needs.check.outputs.rsku_tag }}
+          NEW_SUSFS: ${{ needs.check.outputs.susfs_tag }}
+          NEW_GKI:   ${{ needs.check.outputs.gki_sub }}
+          NEW_CLO:   ${{ needs.check.outputs.clo_sub }}
+          KSUN_GATE: ${{ needs.verify-ksun.result }}
+          RSKU_GATE: ${{ needs.verify-rsku.result }}
         run: |
+          OLD_KSUN=$(jq -r .ksun_tag sources/source-pins.json)
+          OLD_RSKU=$(jq -r .rsku_tag sources/source-pins.json)
+
+          HELD_BACK=()
+
+          # "success" = gate ran and passed. "skipped" = tag didn't change
+          # this run, so new==old anyway — safe either way. Anything else
+          # (failure/cancelled) means the candidate broke the build — keep
+          # the last known-good tag instead of bumping to a broken one.
+          if [ "$KSUN_GATE" = "success" ] || [ "$KSUN_GATE" = "skipped" ]; then
+            FINAL_KSUN="$NEW_KSUN"
+          else
+            FINAL_KSUN="$OLD_KSUN"
+            HELD_BACK+=("KSU-Next: verify build failed, kept ${OLD_KSUN}")
+          fi
+
+          if [ "$RSKU_GATE" = "success" ] || [ "$RSKU_GATE" = "skipped" ]; then
+            FINAL_RSKU="$NEW_RSKU"
+          else
+            FINAL_RSKU="$OLD_RSKU"
+            HELD_BACK+=("ReSukiSU: verify build failed, kept ${OLD_RSKU}")
+          fi
+
+          # susfs_tag / gki_sublevel / clo_sublevel stay ungated (see commit
+          # message) — always take the freshly-detected value.
           jq -n \
-            --arg gki  "$CHECK_GKI_SUB" \
-            --arg clo  "$CHECK_CLO_SUB" \
-            --arg ksun "$CHECK_KSUN_TAG" \
-            --arg suki "$CHECK_SUKI_TAG" \
-            --arg susfs "$CHECK_SUSFS_TAG" \
+            --arg gki   "$NEW_GKI" \
+            --arg clo   "$NEW_CLO" \
+            --arg ksun  "$FINAL_KSUN" \
+            --arg rsku  "$FINAL_RSKU" \
+            --arg susfs "$NEW_SUSFS" \
             '{
               gki_sublevel: $gki,
               clo_sublevel: $clo,
               ksun_tag:     $ksun,
-              suki_tag:     $suki,
+              rsku_tag:     $rsku,
               susfs_tag:    $susfs
             }' > sources/source-pins.json
+
+          HELD_BACK_DETAIL=$(printf '%s\n' "${HELD_BACK[@]}")
+          {
+            echo "held_back<<EOF"
+            echo "$HELD_BACK_DETAIL"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          if git diff --quiet -- sources/source-pins.json; then
+            echo "[INFO] No effective change after gating — nothing to commit"
+            exit 0
+          fi
 
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -48,11 +152,29 @@ jobs:
           git commit -m "chore: update source-pins.json [skip ci]"
           git push
 
-      - name: "📣 Telegram report"
-        if: always()
+  notify:
+    name: "Telegram report"
+    needs: [check, apply-pins]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 1
+
+      - name: "Telegram"
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_TOPIC_ID:  ${{ secrets.TELEGRAM_TOPIC_ID }}
-          RUN_URL: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          RUN_URL:         "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          HAS_UPDATE:      ${{ needs.check.outputs.has_update }}
+          CHECK_KSUN_TAG:  ${{ needs.check.outputs.ksun_tag }}
+          CHECK_RSKU_TAG:  ${{ needs.check.outputs.rsku_tag }}
+          CHECK_SUSFS_TAG: ${{ needs.check.outputs.susfs_tag }}
+          CHECK_GKI_SUB:   ${{ needs.check.outputs.gki_sub }}
+          CHECK_CLO_SUB:   ${{ needs.check.outputs.clo_sub }}
+          UPDATE_DETAIL:   ${{ needs.check.outputs.update_detail }}
+          CHECK_FAILED:    ${{ needs.check.outputs.check_failed }}
+          HELD_BACK:       ${{ needs.apply-pins.outputs.held_back }}
         run: bash scripts/notify.sh check

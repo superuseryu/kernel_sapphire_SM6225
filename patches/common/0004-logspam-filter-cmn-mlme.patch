@@ -1,0 +1,22 @@
+diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
+index 61aae7d70..f39cd9c89 100644
+--- a/kernel/printk/printk.c
++++ b/kernel/printk/printk.c
+@@ -2172,14 +2172,15 @@ int vprintk_store(int facility, int level,
+ 	enum printk_info_flags filter_flags = 0;
+ 	va_list args3;
+ 
+-	/* Drop known vendor display-driver, N7 charging, and WLAN HDD connectivity-log spam before it reaches the ringbuffer */
++	/* Drop known vendor display-driver, N7 charging, and WLAN HDD/CMN_MLME connectivity-log spam before it reaches the ringbuffer */
+ 	va_copy(args3, args);
+ 	printk_sprint(filter_buf, sizeof(filter_buf), facility, &filter_flags, fmt, args3);
+ 	va_end(args3);
+ 	if (strstr(filter_buf, "[drm") != NULL || strstr(filter_buf, "mi_disp") != NULL ||
+ 	    strstr(filter_buf, "monitor_smart_chg") != NULL ||
+ 	    strstr(filter_buf, "wlan_hdd_send_connectivity_log_to_user") != NULL ||
+-	    strstr(filter_buf, "wlan_hdd_put_connectivity_logging_data") != NULL)
++	    strstr(filter_buf, "wlan_hdd_put_connectivity_logging_data") != NULL ||
++	    strstr(filter_buf, "CMN_MLME") != NULL)
+ 		return 0;
+ 
+ 	/*

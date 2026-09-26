@@ -27,7 +27,7 @@ esac
 
 case "${KSU_TYPE}" in
   ksun) KSU_LABEL="KSU-Next" ;;
-  suki) KSU_LABEL="SukiSU"  ;;
+  rsku) KSU_LABEL="ReSukiSU"      ;;
   none) KSU_LABEL="NoKSU"   ;;
   *)    KSU_LABEL="${KSU_TYPE}" ;;
 esac
@@ -38,7 +38,7 @@ ZIP_NAME="AK3-${SRC_LABEL}-${KSU_LABEL}-${KERNEL_VERSION}-$(date +'%Y-%m')${SUFF
 # Named image used by AIO pack-release.sh when extracting
 case "$KSU_TYPE" in
   ksun) IMAGE_NAME="Image.gki.ksu"  ;;
-  suki) IMAGE_NAME="Image.gki.suki" ;;
+  rsku) IMAGE_NAME="Image.gki.rsku" ;;
   none) IMAGE_NAME="Image.gki.noksu";;
   *)    IMAGE_NAME="Image"          ;;
 esac
@@ -49,6 +49,17 @@ git clone --depth=1 "$AK3_REPO" ak3_tmp
 
 # Per-variant ZIP: only Image (for flashing) — no named copy to keep size lean
 cp "$IMAGE" "ak3_tmp/Image"
+
+# Bundle zram modules if available (globally, all variants)
+KO_DIR="${WORK_DIR}/out/dist/ko"
+if [ -f "${KO_DIR}/zram.ko" ] && [ -f "${KO_DIR}/zsmalloc.ko" ]; then
+  mkdir -p "ak3_tmp/modules/system/lib/modules"
+  cp "${KO_DIR}/zram.ko"     "ak3_tmp/modules/system/lib/modules/"
+  cp "${KO_DIR}/zsmalloc.ko" "ak3_tmp/modules/system/lib/modules/"
+  echo "[INFO] zram modules bundled into zip"
+else
+  echo "[WARN] zram.ko/zsmalloc.ko not found in ${KO_DIR} — skipping module bundle"
+fi
 
 cd ak3_tmp
 zip -r9 "../${ZIP_NAME}" * -x .git/*

@@ -1,0 +1,26 @@
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 8617db765..5a0f8e3f7 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -8533,10 +8533,21 @@ SYSCALL_DEFINE3(sched_getaffinity, pid_t, pid, unsigned int, len,
+ 	return ret;
+ }
+ 
++static DEFINE_PER_CPU(unsigned long, last_yield);
++
+ static void do_sched_yield(void)
+ {
+ 	struct rq_flags rf;
+ 	struct rq *rq;
++	int cpu = raw_smp_processor_id();
++
++	cond_resched();
++
++	/* rate limit yielding to once per jiffy */
++	if (!time_after(jiffies, per_cpu(last_yield, cpu)))
++		return;
++
++	per_cpu(last_yield, cpu) = jiffies;
+ 
+ 	rq = this_rq_lock_irq(&rf);
+ 

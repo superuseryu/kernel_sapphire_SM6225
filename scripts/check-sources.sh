@@ -80,16 +80,21 @@ elif [ "$CLO_SUB" != "$PIN_CLO" ]; then
   UPDATES+=("CLO: ${PIN_CLO} → ${CLO_SUB}")
 fi
 
+KSUN_CHANGED="false"
+SUKI_CHANGED="false"
+
 if [ "$KSUN_TAG" = "unknown" ]; then
   FAILED+=("KSU-Next"); KSUN_TAG="$PIN_KSUN"
 elif [ "$KSUN_TAG" != "$PIN_KSUN" ]; then
   UPDATES+=("KSU-Next: ${PIN_KSUN} → ${KSUN_TAG}")
+  KSUN_CHANGED="true"
 fi
 
 if [ "$SUKI_TAG" = "unknown" ]; then
   FAILED+=("SukiSU"); SUKI_TAG="$PIN_SUKI"
 elif [ "$SUKI_TAG" != "$PIN_SUKI" ]; then
   UPDATES+=("SukiSU: ${PIN_SUKI} → ${SUKI_TAG}")
+  SUKI_CHANGED="true"
 fi
 
 if [ "$SUSFS_TAG" = "unknown" ]; then
@@ -114,20 +119,24 @@ else
   UPDATE_DETAIL=""
 fi
 
+# Job-level outputs — consumed cross-job by check-updates.yml (verify gate +
+# apply-pins). Multi-line values use the same <<EOF heredoc syntax GITHUB_ENV
+# uses; GITHUB_OUTPUT supports it identically.
 {
-  echo "CHECK_KSUN_TAG=$KSUN_TAG"
-  echo "CHECK_SUKI_TAG=$SUKI_TAG"
-  echo "CHECK_SUSFS_TAG=$SUSFS_TAG"
-  echo "CHECK_GKI_SUB=$GKI_SUB"
-  echo "CHECK_CLO_SUB=$CLO_SUB"
-  echo "HAS_UPDATE=$HAS_UPDATE"
-  # Multi-line value for GITHUB_ENV
-  echo "UPDATE_DETAIL<<EOF"
+  echo "ksun_tag=$KSUN_TAG"
+  echo "suki_tag=$SUKI_TAG"
+  echo "susfs_tag=$SUSFS_TAG"
+  echo "gki_sub=$GKI_SUB"
+  echo "clo_sub=$CLO_SUB"
+  echo "has_update=$HAS_UPDATE"
+  echo "ksun_changed=$KSUN_CHANGED"
+  echo "suki_changed=$SUKI_CHANGED"
+  echo "update_detail<<EOF"
   echo "$UPDATE_DETAIL"
   echo "EOF"
-  echo "CHECK_FAILED<<EOF"
+  echo "check_failed<<EOF"
   echo "$FAILED_DETAIL"
   echo "EOF"
-} >> "${GITHUB_ENV:-/dev/null}"
+} >> "${GITHUB_OUTPUT:-/dev/null}"
 
 echo "=== Done ==="

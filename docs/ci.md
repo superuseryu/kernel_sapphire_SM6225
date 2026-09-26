@@ -1,4 +1,4 @@
-# Setup
+# CI / Fork Setup
 
 ## Telegram Notifications (Optional)
 

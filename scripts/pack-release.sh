@@ -26,15 +26,15 @@ if [ "$ZIP_MODE" = "aio" ] || [ "$ZIP_MODE" = "both" ]; then
     [ -f "$ARTIFACT_ZIP" ] || continue
 
     # Derive named image from artifact dir name
-    # artifact dirs: gki-ksun, gki-suki, gki-noksu, clo-ksun, clo-suki, clo-noksu
+    # artifact dirs: gki-ksun, gki-sksu, gki-nksu, clo-ksun, clo-sksu, clo-nksu
     DIR_NAME=$(basename "$ARTIFACT_DIR")
     case "$DIR_NAME" in
       gki-ksun)  IMG_NAME="Image.gki.ksu"   ;;
-      gki-suki)  IMG_NAME="Image.gki.suki"  ;;
-      gki-noksu) IMG_NAME="Image.gki.noksu" ;;
+      gki-sksu)  IMG_NAME="Image.gki.suki"  ;;
+      gki-nksu) IMG_NAME="Image.gki.noksu" ;;
       clo-ksun)  IMG_NAME="Image.clo.ksu"   ;;
-      clo-suki)  IMG_NAME="Image.clo.suki"  ;;
-      clo-noksu) IMG_NAME="Image.clo.noksu" ;;
+      clo-sksu)  IMG_NAME="Image.clo.suki"  ;;
+      clo-nksu) IMG_NAME="Image.clo.noksu" ;;
       *)         IMG_NAME="Image.$(echo "$DIR_NAME" | tr -d '-')" ;;
     esac
 
@@ -63,6 +63,6 @@ fi
 
 # Attach zram module zip(s) to the release as-is, independent of ZIP_MODE —
 # it's a standalone Magisk/KSU module, not part of the kernel Image bundle.
-find ./artifacts -name "zram-multicomp-*.zip" -exec cp {} ./release_zips/ \;
+find ./artifacts -name "seiran-core.zip" -exec cp {} ./release_zips/ \;
 
 ls -lh ./release_zips/

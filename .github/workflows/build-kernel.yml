@@ -5,12 +5,14 @@ on:
     inputs:
       variant_name:  { type: string, required: true }
       source_type:   { type: string, required: true }   # gki | clo
-      ksu_type:      { type: string, required: true }   # ksun | suki | none
+      ksu_type:      { type: string, required: true }   # ksun | sksu | none
       zip_prefix:    { type: string, required: true }
       artifact_name: { type: string, required: true }
       defconfig:     { type: string, required: true }
       clo_fragment:  { type: string, required: false }  # e.g. vendor/bengal_GKI.config (CLO only)
       build_type:    { type: string, required: true }   # stable | testing
+      ksun_tag_pin:  { type: string, required: false, default: "" }  # verify-gate only
+      rsku_tag_pin:  { type: string, required: false, default: "" }  # verify-gate only
 
 env:
   OUT_DIR: "out"
@@ -25,21 +27,21 @@ jobs:
       KERNEL_SRC: ${{ github.workspace }}/kernel_src
 
     steps:
-      - name: "📦 Checkout"
+      - name: "Checkout"
         uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 1
 
-      - name: "🛠️ Setup env"
+      - name: "Setup env"
         uses: ./.github/actions/setup-env
 
-      - name: "📌 Read CLO source pin"
+      - name: "Read CLO source pin"
         if: inputs.source_type == 'clo'
         id: clo-pin
         run: |
           echo "hash=$(jq -r .clo_sublevel sources/source-pins.json)" >> $GITHUB_OUTPUT
 
-      - name: "📦 Restore CLO source cache"
+      - name: "Restore CLO source cache"
         if: inputs.source_type == 'clo'
         id: clo-src-cache
         uses: actions/cache/restore@v4
@@ -48,7 +50,7 @@ jobs:
           key: clo-source-${{ steps.clo-pin.outputs.hash }}
           restore-keys: clo-source-
 
-      - name: "🌟 Clone kernel source"
+      - name: "Clone kernel source"
         env:
           SOURCE_TYPE:   ${{ inputs.source_type }}
           KSU_TYPE:      ${{ inputs.ksu_type }}
@@ -56,17 +58,17 @@ jobs:
           CLO_FRAGMENT:  ${{ inputs.clo_fragment }}
         run: bash scripts/clone-source.sh
 
-      - name: "💾 Save CLO source cache"
+      - name: "Save CLO source cache"
         if: inputs.source_type == 'clo'
         uses: actions/cache/save@v4
         with:
           path: ${{ env.KERNEL_SRC }}
           key: clo-source-${{ steps.clo-pin.outputs.hash }}
 
-      - name: "🔧 Fix source warnings"
+      - name: "Fix source warnings"
         run: bash scripts/fix-source-warnings.sh "${{ env.KERNEL_SRC }}"
 
-      - name: "⚡ Configure ccache"
+      - name: "Configure ccache"
         if: inputs.build_type == 'stable'
         run: |
           sudo apt-get install -y ccache
@@ -81,7 +83,7 @@ jobs:
           echo "CCACHE_COMPRESSLEVEL=3"                                                                            >> $GITHUB_ENV
           echo "CCACHE_SLOPPINESS=file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale" >> $GITHUB_ENV
 
-      - name: "⚡ Restore ccache"
+      - name: "Restore ccache"
         if: inputs.build_type == 'stable'
         id: ccache-restore
         uses: actions/cache/restore@v4
@@ -91,20 +93,28 @@ jobs:
           restore-keys: |
             ccache-${{ inputs.source_type }}-${{ inputs.ksu_type }}-
 
-      - name: "🔧 Setup toolchain"
+      - name: "Setup toolchain"
         env:
           SOURCE_TYPE: ${{ inputs.source_type }}
         run: bash scripts/setup-toolchain.sh
 
-      - name: "🩹 Apply patches"
+      - name: "Apply patches"
         env:
           SOURCE_TYPE: ${{ inputs.source_type }}
           KSU_TYPE:    ${{ inputs.ksu_type }}
           BUILD_TYPE:  ${{ inputs.build_type }}
           DEFCONFIG:   ${{ inputs.defconfig }}
-        run: bash scripts/apply-patches.sh
+        run: |
+          set -o pipefail
+          bash scripts/apply-patches.sh
 
-      - name: "🛡️ Setup BBG"
+      - name: "Setup NoMount"
+        working-directory: ${{ env.KERNEL_SRC }}
+        run: |
+          curl -LSs "https://raw.githubusercontent.com/maxsteeel/nomount/refs/heads/dev/kernel/setup.sh" \
+            | bash -s dev
+
+      - name: "Setup BBG"
         if: inputs.ksu_type == 'ksun'
         working-directory: ${{ env.KERNEL_SRC }}
         run: |
@@ -118,21 +128,24 @@ jobs:
             sed -i '/source "security\/keys\/Kconfig"/a source "security/baseband-guard/Kconfig"' \
             security/Kconfig
 
-      - name: "🔑 Setup KSU + SUSFS"
+      - name: "Setup KSU + SUSFS"
         if: inputs.ksu_type != 'none'
         uses: ./.github/actions/setup-ksu
         with:
-          ksu_type:   ${{ inputs.ksu_type }}
-          kernel_dir: ${{ env.KERNEL_SRC }}
-          work_dir:   ${{ env.WORK_DIR }}
+          ksu_type:     ${{ inputs.ksu_type }}
+          kernel_dir:   ${{ env.KERNEL_SRC }}
+          work_dir:     ${{ env.WORK_DIR }}
+          ksun_tag_pin: ${{ inputs.ksun_tag_pin }}
+          rsku_tag_pin: ${{ inputs.rsku_tag_pin }}
 
-      - name: "🐳 Droidspaces"
+      - name: "Droidspaces"
+        if: inputs.source_type != 'kernel-org'
         working-directory: ${{ env.KERNEL_SRC }}
         run: |
           bash ${{ github.workspace }}/scripts/droidspaces.sh \
             "arch/arm64/configs/${{ inputs.defconfig }}"
 
-      - name: "⚙️ Kernel configs"
+      - name: "Kernel configs"
         uses: ./.github/actions/setup-configs
         with:
           ksu_type:     ${{ inputs.ksu_type }}
@@ -141,7 +154,7 @@ jobs:
           kernel_dir:   ${{ env.KERNEL_SRC }}
           clo_fragment: ${{ inputs.clo_fragment }}
 
-      - name: "🏷️ Localversion"
+      - name: "Localversion"
         working-directory: ${{ env.KERNEL_SRC }}
         run: |
           SHORT_SHA="${{ github.sha }}"
@@ -155,7 +168,7 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add . && git commit -m "clean dirty flag" || true
 
-      - name: "🚀 Build kernel"
+      - name: "Build kernel"
         id: build
         timeout-minutes: 50
         env:
@@ -164,38 +177,24 @@ jobs:
           DEFCONFIG:    ${{ inputs.defconfig }}
           CLO_FRAGMENT: ${{ inputs.clo_fragment }}
           VARIANT:      ${{ inputs.variant_name }}
-        run: bash scripts/build.sh
+        run: |
+          set -o pipefail
+          bash scripts/build.sh
 
-      - name: "⚡ Save ccache"
+      - name: "Save ccache"
         if: inputs.build_type == 'stable' && steps.ccache-restore.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.ccache
           key: ccache-${{ inputs.source_type }}-${{ inputs.ksu_type }}-${{ hashFiles('sources/source-pins.json') }}
 
-      - name: "🔍 Verify kernel"
-        run: bash scripts/verify-kernel.sh
-
-      - name: "💉 KPM patch"
-        if: inputs.ksu_type == 'suki'
-        working-directory: ${{ env.WORK_DIR }}/out/dist
+      - name: "Verify kernel"
         run: |
-          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" \
-            -o patch_linux
-          chmod +x patch_linux && ./patch_linux
-          rm -f Image && mv oImage Image
+          set -o pipefail
+          bash scripts/verify-kernel.sh
 
-      - name: "📋 Build summary"
-        if: always()
-        env:
-          VARIANT:     ${{ inputs.variant_name }}
-          KSU_TYPE:    ${{ inputs.ksu_type }}
-          SOURCE_TYPE: ${{ inputs.source_type }}
-          BUILD_TYPE:  ${{ inputs.build_type }}
-          RUN_URL:     "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-        run: bash scripts/build-summary.sh
 
-      - name: "📣 Notify variant failure"
+      - name: "Notify variant failure"
         if: failure()
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -208,7 +207,7 @@ jobs:
           RUN_NUMBER:  ${{ github.run_number }}
         run: bash scripts/notify.sh variant-failure
 
-      - name: "📦 Pack ZIP"
+      - name: "Pack ZIP"
         env:
           ZIP_PREFIX:  ${{ inputs.zip_prefix }}
           KSU_TYPE:    ${{ inputs.ksu_type }}
@@ -216,13 +215,16 @@ jobs:
           SOURCE_TYPE: ${{ inputs.source_type }}
         run: bash scripts/pack-zip.sh
 
-      - name: "📦 Pack ZRAM module"
+      - name: "Pack Seiran Core module"
+        if: inputs.artifact_name == 'gki-ksun'
         env:
           SOURCE_TYPE: ${{ inputs.artifact_name }}
           COMMIT_SHA:  ${{ github.sha }}
-        run: bash scripts/pack-zram-module.sh
+          BUILD_NUM:   ${{ github.run_number }}
+        run: |
+          bash scripts/pack-module.sh
 
-      - name: "🏷️ Capture uname"
+      - name: "Capture uname"
         run: |
           UNAME=$(grep UTS_RELEASE \
             ${{ env.WORK_DIR }}/out/include/generated/utsrelease.h 2>/dev/null \
@@ -230,17 +232,20 @@ jobs:
           echo "$UNAME" > ${{ env.WORK_DIR }}/out/dist/kernel_uname.txt
           echo "Kernel uname: $UNAME"
 
-      - name: "📤 Upload artifact"
+
+      - name: "Upload artifact"
         uses: actions/upload-artifact@v4.6.2
         with:
           name: ${{ inputs.artifact_name }}
           path: |
             ${{ env.WORK_DIR }}/${{ env.ZIP_NAME }}
-            ${{ env.WORK_DIR }}/out/zram-multicomp-${{ inputs.artifact_name }}.zip
+            ${{ env.WORK_DIR }}/out/seiran-core.zip
             ${{ env.WORK_DIR }}/out/dist/kernel_version.txt
             ${{ env.WORK_DIR }}/out/dist/kernel_uname.txt
             ${{ env.WORK_DIR }}/ksun_tag.txt
-            ${{ env.WORK_DIR }}/suki_ksu_tag.txt
+            ${{ env.WORK_DIR }}/rsku_tag.txt
+            ${{ env.WORK_DIR }}/ksun_sha.txt
+            ${{ env.WORK_DIR }}/rsku_sha.txt
             ${{ env.WORK_DIR }}/ksun_version.txt
-            ${{ env.WORK_DIR }}/suki_version.txt
+            ${{ env.WORK_DIR }}/rsku_version.txt
           retention-days: 1

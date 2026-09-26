@@ -1,0 +1,73 @@
+diff --git a/drivers/cpuidle/governors/nap/nap.c b/drivers/cpuidle/governors/nap/nap.c
+index b3c4b7bdd..009dfa98f 100644
+--- a/drivers/cpuidle/governors/nap/nap.c
++++ b/drivers/cpuidle/governors/nap/nap.c
+@@ -220,10 +220,14 @@ static int nap_select(struct cpuidle_driver *drv,
+ 		kernel_neon_begin();
+ 		idx = nap_fpu_select(drv, dev, d);
+ 		kernel_neon_end();
++		d->stats.simd_ok++;
+ 
+-		if (idx < 0)
++		if (idx < 0) {
++			d->stats.fpu_ret_neg++;
+ 			idx = nap_fallback_heuristic(drv, dev);
++		}
+ 	} else {
++		d->stats.simd_denied++;
+ 		idx = nap_fallback_heuristic(drv, dev);
+ 	}
+ 
+@@ -278,6 +282,7 @@ static void nap_reflect(struct cpuidle_device *dev, int index)
+ 		d->learn_counter = 0;
+ 		d->last_learn_jiffies = jiffies;
+ 		d->needs_learn = true;
++		d->stats.need_learn_set++;
+ 	}
+ 
+ 	d->stats.total_residency_ns += measured_ns;
+@@ -334,6 +339,7 @@ static ssize_t stats_show(struct kobject *kobj,
+ {
+ 	int cpu, len = 0;
+ 	u64 total_sel = 0, total_res = 0, total_under = 0, total_learn = 0;
++	u64 total_simd_ok = 0, total_simd_denied = 0, total_fpu_neg = 0, total_nls = 0;
+ 
+ 	for_each_online_cpu(cpu) {
+ 		struct nap_cpu_data *d = &per_cpu(nap_data, cpu);
+@@ -342,6 +348,10 @@ static ssize_t stats_show(struct kobject *kobj,
+ 		total_res   += d->stats.total_residency_ns;
+ 		total_under += d->stats.overshoot_count;
+ 		total_learn += d->stats.learn_count;
++		total_simd_ok += d->stats.simd_ok;
++		total_simd_denied += d->stats.simd_denied;
++		total_fpu_neg += d->stats.fpu_ret_neg;
++		total_nls += d->stats.need_learn_set;
+ 	}
+ 
+ 	len += sysfs_emit_at(buf, len, "total_selects: %llu\n", total_sel);
+@@ -351,6 +361,10 @@ static ssize_t stats_show(struct kobject *kobj,
+ 	len += sysfs_emit_at(buf, len, "overshoot_rate_permil: %llu\n",
+ 			     total_sel ? div_u64(total_under * 1000, total_sel) : 0);
+ 	len += sysfs_emit_at(buf, len, "learn_count: %llu\n", total_learn);
++	len += sysfs_emit_at(buf, len, "simd_ok: %llu\n", total_simd_ok);
++	len += sysfs_emit_at(buf, len, "simd_denied: %llu\n", total_simd_denied);
++	len += sysfs_emit_at(buf, len, "fpu_ret_neg: %llu\n", total_fpu_neg);
++	len += sysfs_emit_at(buf, len, "need_learn_set: %llu\n", total_nls);
+ 	return len;
+ }
+ 
+diff --git a/drivers/cpuidle/governors/nap/nap.h b/drivers/cpuidle/governors/nap/nap.h
+index d7aef6979..8afb33d96 100644
+--- a/drivers/cpuidle/governors/nap/nap.h
++++ b/drivers/cpuidle/governors/nap/nap.h
+@@ -185,6 +185,10 @@ struct nap_stats {
+ 	u64 total_residency_ns;
+ 	u64 overshoot_count;
+ 	u64 learn_count;
++	u64 simd_ok;
++	u64 simd_denied;
++	u64 fpu_ret_neg;
++	u64 need_learn_set;
+ };
+ 
+ struct nap_cpu_data {

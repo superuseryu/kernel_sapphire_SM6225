@@ -1,0 +1,14 @@
+diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
+index b07d278d2..61aae7d70 100644
+--- a/kernel/printk/printk.c
++++ b/kernel/printk/printk.c
+@@ -720,7 +720,8 @@ static ssize_t devkmsg_write(struct kiocb *iocb, struct iov_iter *from)
+ 	}
+ 
+ 	if ((strstr(line, "healthd")) || (strstr(line, "logd")) ||
+-		 strstr(line, "dashd")) {
++		 strstr(line, "dashd") ||
++		 strstr(line, "android.hardware.nfc@1.2")) {
+ 		kfree(buf);
+ 		return len;
+ 	}

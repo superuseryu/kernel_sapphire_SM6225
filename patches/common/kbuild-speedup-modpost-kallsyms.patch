@@ -1,0 +1,435 @@
+diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
+index 54ad86d13..7dbed9091 100644
+--- a/scripts/kallsyms.c
++++ b/scripts/kallsyms.c
+@@ -61,12 +61,51 @@ static int all_symbols;
+ static int absolute_percpu;
+ static int base_relative;
+ 
++/* A dynamic array of symbols, encoded by symbol index. */
++struct sym_arr {
++	unsigned int *sym_indexes;
++	unsigned int cnt, cap;
++};
++
+ static int token_profit[0x10000];
++static struct sym_arr token_syms[0x10000];
+ 
+ /* the table that holds the result of the compression */
+ static unsigned char best_table[256][2];
+ static unsigned char best_table_len[256];
+ 
++static unsigned int sym_arr_last(const struct sym_arr *arr)
++{
++	return arr->cnt ? arr->sym_indexes[arr->cnt - 1] : UINT_MAX;
++}
++
++static void sym_arr_maybe_expand(struct sym_arr *arr)
++{
++	if (arr->cap > arr->cnt)
++		return;
++
++	arr->cap = arr->cap ? arr->cap * 2 : 16;
++	arr->sym_indexes = realloc(arr->sym_indexes,
++				   arr->cap * sizeof(*arr->sym_indexes));
++	if (!arr->sym_indexes) {
++		fprintf(stderr, "out of memory\n");
++		exit(1);
++	}
++}
++
++static void sym_arr_add(struct sym_arr *arr, unsigned int sym_idx)
++{
++	sym_arr_maybe_expand(arr);
++	arr->sym_indexes[arr->cnt++] = sym_idx;
++}
++
++static void sym_arr_free(struct sym_arr *arr)
++{
++	free(arr->sym_indexes);
++	arr->sym_indexes = NULL;
++	arr->cnt = 0;
++	arr->cap = 0;
++}
+ 
+ static void usage(void)
+ {
+@@ -502,6 +541,15 @@ static void write_src(void)
+ 	printf("\n");
+ }
+ 
++static unsigned int token_index(unsigned char first, unsigned char second)
++{
++	return first + (second << 8);
++}
++
++static unsigned int sym_token_index(const unsigned char *symbol, int first_idx)
++{
++	return token_index(symbol[first_idx], symbol[first_idx + 1]);
++}
+ 
+ /* table lookup compression functions */
+ 
+@@ -511,7 +559,7 @@ static void learn_symbol(const unsigned char *symbol, int len)
+ 	int i;
+ 
+ 	for (i = 0; i < len - 1; i++)
+-		token_profit[ symbol[i] + (symbol[i + 1] << 8) ]++;
++		token_profit[sym_token_index(symbol, i)]++;
+ }
+ 
+ /* decrease the count for all the possible tokens in a symbol */
+@@ -520,16 +568,80 @@ static void forget_symbol(const unsigned char *symbol, int len)
+ 	int i;
+ 
+ 	for (i = 0; i < len - 1; i++)
+-		token_profit[ symbol[i] + (symbol[i + 1] << 8) ]--;
++		token_profit[sym_token_index(symbol, i)]--;
++}
++
++static void token_add_symbol(unsigned int token_idx, unsigned int sym_idx)
++{
++	struct sym_arr *arr = &token_syms[token_idx];
++
++	/* Symbol indexes kept in sorted order, check for duplicate. */
++	if (sym_arr_last(arr) == sym_idx)
++		return;
++
++	sym_arr_add(arr, sym_idx);
++}
++
++static void symbol_index_all_tokens(const unsigned char *symbol, int len,
++				    unsigned int sym_idx)
++{
++	int i;
++
++	for (i = 0; i < len - 1; i++) {
++		const unsigned int token_idx = sym_token_index(symbol, i);
++
++		token_add_symbol(token_idx, sym_idx);
++	}
++}
++
++/*
++ * The symbol just got compressed. The only parts of the symbol that changed
++ * meaningfully are those containing the newly assigned compressed char, so
++ * index those.
++ */
++static void symbol_index_new_tokens(const unsigned char *symbol, int len,
++				    unsigned int sym_idx, int compressed_chr)
++{
++	int i;
++
++	for (i = 0; i < len - 1; i++) {
++		const unsigned int token_idx = sym_token_index(symbol, i);
++
++		if (symbol[i] == compressed_chr ||
++		    symbol[i + 1] == compressed_chr)
++			token_add_symbol(token_idx, sym_idx);
++	}
+ }
+ 
+-/* do the initial token count */
+ static void build_initial_tok_table(void)
+ {
+ 	unsigned int i;
+ 
+ 	for (i = 0; i < table_cnt; i++)
+ 		learn_symbol(table[i]->sym, table[i]->len);
++
++	/*
++	 * The initial occurrence counts tell us exactly how much memory should
++	 * be reserved for each token's symbol array.
++	 */
++	for (i = 0; i < ARRAY_SIZE(token_syms); i++) {
++		const int nr_syms = token_profit[i];
++
++		if (!nr_syms)
++			continue;
++
++		token_syms[i].cap = nr_syms;
++		token_syms[i].sym_indexes =
++			malloc(nr_syms * sizeof(unsigned int));
++		if (!token_syms[i].sym_indexes) {
++			fprintf(stderr, "out of memory\n");
++			exit(1);
++		}
++	}
++
++	/* For every symbol, index every token -> symbol it is present in. */
++	for (i = 0; i < table_cnt; i++)
++		symbol_index_all_tokens(table[i]->sym, table[i]->len, i);
+ }
+ 
+ static unsigned char *find_token(unsigned char *str, int len,
+@@ -546,27 +658,30 @@ static unsigned char *find_token(unsigned char *str, int len,
+ 
+ /* replace a given token in all the valid symbols. Use the sampled symbols
+  * to update the counts */
+-static void compress_symbols(const unsigned char *str, int idx)
++static void compress_symbols(const unsigned char *str, int compressed_chr)
+ {
+-	unsigned int i, len, size;
++	const unsigned int token_idx = sym_token_index(str, 0);
++	struct sym_arr *arr = &token_syms[token_idx];
++	unsigned int sym_idx, j, len, size;
+ 	unsigned char *p1, *p2;
+ 
+-	for (i = 0; i < table_cnt; i++) {
++	/* Iterate through all symbols this token is found in and compress. */
++	for (j = 0; j < arr->cnt; j++) {
++		sym_idx = arr->sym_indexes[j];
+ 
+-		len = table[i]->len;
+-		p1 = table[i]->sym;
++		len = table[sym_idx]->len;
++		p1 = table[sym_idx]->sym;
+ 
+-		/* find the token on the symbol */
+ 		p2 = find_token(p1, len, str);
+ 		if (!p2) continue;
+ 
+ 		/* decrease the counts for this symbol's tokens */
+-		forget_symbol(table[i]->sym, len);
++		forget_symbol(table[sym_idx]->sym, len);
+ 
+ 		size = len;
+ 
+ 		do {
+-			*p2 = idx;
++			*p2 = compressed_chr;
+ 			p2++;
+ 			size -= (p2 - p1);
+ 			memmove(p2, p2 + 1, size);
+@@ -580,11 +695,14 @@ static void compress_symbols(const unsigned char *str, int idx)
+ 
+ 		} while (p2);
+ 
+-		table[i]->len = len;
++		table[sym_idx]->len = len;
+ 
+-		/* increase the counts for this symbol's new tokens */
+-		learn_symbol(table[i]->sym, len);
++		learn_symbol(table[sym_idx]->sym, len);
++		symbol_index_new_tokens(table[sym_idx]->sym, len, sym_idx,
++					compressed_chr);
+ 	}
++
++	sym_arr_free(arr); /* No symbol contains this token any more. */
+ }
+ 
+ /* search the token with the maximum profit */
+diff --git a/scripts/mod/modpost.c b/scripts/mod/modpost.c
+index d6339783c..a250415a4 100644
+--- a/scripts/mod/modpost.c
++++ b/scripts/mod/modpost.c
+@@ -1678,11 +1678,65 @@ static void extable_mismatch_handler(const char* modname, struct elf_info *elf,
+ 		      fromsec, (long)r->r_offset, tosec);
+ }
+ 
++/*
++ * mismatch_cache[section index] ->
++ *   0 - uncached.
++ *  -1 - no mismatch.
++ *  >0 - mismatch index + 1.
++ */
++static int *mismatch_cache;
++
++static void init_mismatch_cache(unsigned int num_sections)
++{
++	mismatch_cache = NOFAIL(calloc(num_sections, sizeof(*mismatch_cache)));
++}
++
++static void reset_mismatch_cache(unsigned int num_sections)
++{
++	memset(mismatch_cache, 0, num_sections * sizeof(*mismatch_cache));
++}
++
++static void free_mismatch_cache(void)
++{
++	free(mismatch_cache);
++	mismatch_cache = NULL;
++}
++
++static const struct sectioncheck
++*cache_mismatch(unsigned int secndx, const struct sectioncheck *mismatch)
++{
++	if (!mismatch) {
++		mismatch_cache[secndx] = -1;
++		return NULL;
++	}
++
++	mismatch_cache[secndx] = (mismatch - sectioncheck) + 1;
++	return mismatch;
++}
++
++static const struct sectioncheck *get_section_mismatch(const char *fromsec,
++		const struct elf_info *elf, unsigned int secndx)
++{
++	int cached;
++
++	if (secndx >= elf->num_sections)
++		return section_mismatch(fromsec, sec_name(elf, secndx));
++
++	cached = mismatch_cache[secndx];
++	if (cached < 0)
++		return NULL;
++	if (cached > 0)
++		return &sectioncheck[cached - 1];
++
++	return cache_mismatch(secndx,
++			      section_mismatch(fromsec, sec_name(elf, secndx)));
++}
++
+ static void check_section_mismatch(const char *modname, struct elf_info *elf,
+ 				   Elf_Rela *r, Elf_Sym *sym, const char *fromsec)
+ {
+-	const char *tosec = sec_name(elf, get_secindex(elf, sym));
+-	const struct sectioncheck *mismatch = section_mismatch(fromsec, tosec);
++	const unsigned int to_secndx = get_secindex(elf, sym);
++	const struct sectioncheck *mismatch = get_section_mismatch(fromsec, elf, to_secndx);
+ 
+ 	if (mismatch) {
+ 		if (mismatch->handler)
+@@ -1920,15 +1974,25 @@ static void check_sec_ref(struct module *mod, const char *modname,
+ 	int i;
+ 	Elf_Shdr *sechdrs = elf->sechdrs;
+ 
++	init_mismatch_cache(elf->num_sections);
++
+ 	/* Walk through all sections */
+ 	for (i = 0; i < elf->num_sections; i++) {
+ 		check_section(modname, elf, &elf->sechdrs[i]);
+ 		/* We want to process only relocation sections and not .init */
+-		if (sechdrs[i].sh_type == SHT_RELA)
+-			section_rela(modname, elf, &elf->sechdrs[i]);
+-		else if (sechdrs[i].sh_type == SHT_REL)
+-			section_rel(modname, elf, &elf->sechdrs[i]);
++		if (sechdrs[i].sh_type == SHT_RELA ||
++		    sechdrs[i].sh_type == SHT_REL) {
++			/* Reset cache per-section. */
++			reset_mismatch_cache(elf->num_sections);
++
++			if (sechdrs[i].sh_type == SHT_RELA)
++				section_rela(modname, elf, &elf->sechdrs[i]);
++			else if (sechdrs[i].sh_type == SHT_REL)
++				section_rel(modname, elf, &elf->sechdrs[i]);
++		}
+ 	}
++
++	free_mismatch_cache();
+ }
+ 
+ static char *remove_dot(char *s)
+diff --git a/scripts/mod/sumversion.c b/scripts/mod/sumversion.c
+index 5dd133017..4939c65f8 100644
+--- a/scripts/mod/sumversion.c
++++ b/scripts/mod/sumversion.c
+@@ -8,6 +8,7 @@
+ #include <errno.h>
+ #include <string.h>
+ #include <limits.h>
++#include <stdbool.h>
+ #include "modpost.h"
+ 
+ /*
+@@ -222,19 +223,11 @@ static void md4_final_ascii(struct md4_ctx *mctx, char *out, unsigned int len)
+ 		 mctx->hash[0], mctx->hash[1], mctx->hash[2], mctx->hash[3]);
+ }
+ 
+-static inline void add_char(unsigned char c, struct md4_ctx *md)
+-{
+-	md4_update(md, &c, 1);
+-}
+-
+-static int parse_string(const char *file, unsigned long len,
+-			struct md4_ctx *md)
++static int parse_string(const char *file, unsigned long len)
+ {
+ 	unsigned long i;
+ 
+-	add_char(file[0], md);
+ 	for (i = 1; i < len; i++) {
+-		add_char(file[i], md);
+ 		if (file[i] == '"' && file[i-1] != '\\')
+ 			break;
+ 	}
+@@ -253,15 +246,44 @@ static int parse_comment(const char *file, unsigned long len)
+ }
+ 
+ /* FIXME: Handle .s files differently (eg. # starts comments) --RR */
++static bool stop_char[256];
++
++static void init_stop_chars(void)
++{
++	static bool done;
++	int chr;
++
++	if (done)
++		return;
++
++	for (chr = 0; chr < 256; chr++)
++		if (chr == '\\' || chr == '"' || chr == '/' || isspace(chr))
++			stop_char[chr] = true;
++
++	done = true;
++}
++
+ static int parse_file(const char *fname, struct md4_ctx *md)
+ {
++	unsigned long i, len, n = 0;
++	unsigned char *buf;
+ 	char *file;
+-	unsigned long i, len;
+ 
+ 	file = read_text_file(fname);
+ 	len = strlen(file);
++	if (!len)
++		goto out_file;
++	init_stop_chars();
++	buf = NOFAIL(malloc(len)); /* File output buffer. */
+ 
+ 	for (i = 0; i < len; i++) {
++		const unsigned char chr = file[i];
++
++		if (!stop_char[chr]) {
++			buf[n++] = file[i];
++			continue;
++		}
++
+ 		/* Collapse and ignore \ and CR. */
+ 		if (file[i] == '\\' && (i+1 < len) && file[i+1] == '\n') {
+ 			i++;
+@@ -274,7 +296,14 @@ static int parse_file(const char *fname, struct md4_ctx *md)
+ 
+ 		/* Handle strings as whole units */
+ 		if (file[i] == '"') {
+-			i += parse_string(file+i, len - i, md);
++			unsigned long slen = parse_string(file+i, len - i);
++
++			/* Closing quote is included if there is one. */
++			if (slen < len - i)
++				slen++;
++			memcpy(buf + n, file + i, slen);
++			n += slen;
++			i += slen - 1;
+ 			continue;
+ 		}
+ 
+@@ -284,11 +313,15 @@ static int parse_file(const char *fname, struct md4_ctx *md)
+ 			continue;
+ 		}
+ 
+-		add_char(file[i], md);
++		buf[n++] = file[i];
+ 	}
++	md4_update(md, buf, n);
++	free(buf);
++out_file:
+ 	free(file);
+ 	return 1;
+ }
++
+ /* Check whether the file is a static library or not */
+ static int is_static_library(const char *objfile)
+ {

@@ -25,7 +25,7 @@ if [ "$BUILD_TYPE" = "testing" ]; then
 fi
 
 BODY="${BODY}**KSU-Next Manager:** [Dev Build ↗](${KSUN_MANAGER_URL})"$'\n'
-BODY="${BODY}**SukiSU Manager:** [Main Build ↗](${SUKI_MANAGER_URL})"$'\n'
+BODY="${BODY}**ReSukiSU Manager:** [Main Build ↗](${RSKU_MANAGER_URL})"$'\n'
 BODY="${BODY}**SUSFS module:** [${SUSFS_VERSION}](${SUSFS_MODULE_URL})"$'\n'
 if [ -n "${KERNEL_VERSION_GKI:-}" ] && [ -n "${KERNEL_VERSION_CLO:-}" ]; then
   BODY="${BODY}**Kernel base (GKI):** \`${KERNEL_VERSION_GKI}\`"$'\n'
@@ -33,13 +33,13 @@ if [ -n "${KERNEL_VERSION_GKI:-}" ] && [ -n "${KERNEL_VERSION_CLO:-}" ]; then
 else
   BODY="${BODY}**Kernel base:** \`${KERNEL_VERSION}\`"$'\n\n'
 fi
-BODY="${BODY}**ZRAM Multi-Comp module:** \`zram-multicomp-<variant>.zip\` — attached below & sent via [Telegram](https://t.me/tmplogchat)"$'\n\n'
+BODY="${BODY}**ZRAM Multi-Comp module:** \`seiran-core.zip\` — attached below & sent via [Telegram](https://t.me/tmplogchat)"$'\n\n'
 
 if [ "$WORKFLOW_TYPE" = "compat" ]; then
-  BODY="${BODY}**Variants:** GKI-Compat (KSU-Next · SukiSU · NoKSU)"$'\n'
+  BODY="${BODY}**Variants:** GKI-Compat (KSU-Next · ReSukiSU · NoKSU)"$'\n'
   BODY="${BODY}**Supported:** Android 13+ (recommended if your ROM is A13/A14)"$'\n'
 else
-  BODY="${BODY}**Variants:** GKI (KSU-Next · SukiSU · NoKSU) · CLO (KSU-Next · SukiSU · NoKSU)"$'\n'
+  BODY="${BODY}**Variants:** GKI (KSU-Next · ReSukiSU · NoKSU) · CLO (KSU-Next · ReSukiSU · NoKSU)"$'\n'
   BODY="${BODY}**Supported:** Android 15+"$'\n'
 fi
 BODY="${BODY}**ROM:** AOSP-based recommended — stock MIUI/HyperOS may have issues"$'\n'
@@ -50,11 +50,11 @@ BODY="${BODY}> [!IMPORTANT]"$'\n'
 BODY="${BODY}> **Manager version must match kernel version.** Can't grant root / manager shows errors? Use the manager links above — not stable releases. Mismatch = can't grant root."$'\n\n'
 
 BODY="${BODY}> [!NOTE]"$'\n'
-BODY="${BODY}> **ZRAM module should match your flashed variant** (e.g. \`zram-multicomp-gki-ksun.zip\` for GKI-KSU-Next). Wrong variant safely no-ops — no harm, but multi-comp/zram-ir won't be active."$'\n\n'
+BODY="${BODY}> **ZRAM module is universal** — one \`seiran-core.zip\` works across all variants (GKI/CLO × KSU-Next/ReSukiSU/NoKSU). Install it after flashing the kernel zip."$'\n\n'
 
 BODY="${BODY}**Commit:** [\`${SHORT_SHA}\`](${COMMIT_URL})"$'\n'
 BODY="${BODY}📋 **Per-build details:** [Run #${GITHUB_RUN_NUMBER} summary](${RUN_URL})"$'\n'
-BODY="${BODY}> Full build logs in \`build-audit-logs-*.zip\` below."
+BODY="${BODY}> Full build logs in \`build-log-run*.zip\` below."
 
 {
   echo "RELEASE_BODY<<EOREL"

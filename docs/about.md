@@ -35,10 +35,3 @@ This is a personal project. You assume all risk by flashing this kernel.
 - Check [installation troubleshooting](installation.md) first
 
 Reach out: DM [@superuseryu](https://t.me/home_yu_chat) via Telegram. If there's no quick response or feedback, support ends there. That's not being rude — it's time management.
-
----
-
-## Contact
-
-- Telegram: [t.me/home_yu_chat](https://t.me/home_yu_chat)
-- Support the project: [ko-fi.com/superuseryu](https://ko-fi.com/superuseryu)

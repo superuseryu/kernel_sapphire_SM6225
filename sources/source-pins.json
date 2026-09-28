@@ -1,7 +1,7 @@
 {
   "gki_sublevel": "v5.15.216",
   "clo_sublevel": "v5.15.197",
-  "ksun_tag": "v3.3.0",
-  "susfs_tag": "v1.5.2+_R28",
-  "rsku_tag": "v4.2.0"
+  "ksun_tag": "v3.4.0",
+  "rsku_tag": "",
+  "susfs_tag": "v1.5.2+_R28"
 }

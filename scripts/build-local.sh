@@ -249,7 +249,7 @@ if [[ $HOST_ARCH != x86_64 && $PLATFORM == linux/amd64 ]]; then
   ls /proc/sys/fs/binfmt_misc 2>/dev/null | grep -qi x86 || \
     warn "no x86 binfmt handler found. install: docker run --privileged --rm tonistiigi/binfmt --install amd64"
 fi
-TAG="seiran-local:24.04-r2-${PLATFORM#linux/}" # r2: image now includes cpio (a GitHub runner has it, a bare ubuntu image does not)
+TAG="seiran-local:24.04-r3-${PLATFORM#linux/}" # bump when the package list changes: image_ok only checks the platform
 SECOPT=()
 if command -v getenforce >/dev/null 2>&1 && [[ "$(getenforce 2>/dev/null)" == Enforcing ]]; then
   # SELinux would deny the container access to the bind mounts (Errno 13); relabeling host dirs (:z/:Z) is more invasive
@@ -264,7 +264,7 @@ if ! image_ok; then
   docker rm -f seiran-bootstrap >/dev/null 2>&1 || true
   docker pull --platform "$PLATFORM" "$IMAGE_BASE"
   docker run --net=host --platform "$PLATFORM" --name seiran-bootstrap "$IMAGE_BASE" bash -c \
-    'export DEBIAN_FRONTEND=noninteractive; apt-get update && apt-get install -y --no-install-recommends python3 python3-yaml patch git curl ca-certificates tar xz-utils zstd sudo cpio && rm -rf /var/lib/apt/lists/*' \
+    'export DEBIAN_FRONTEND=noninteractive; apt-get update && apt-get install -y --no-install-recommends python3 python3-yaml patch git curl ca-certificates tar xz-utils zstd sudo cpio zip unzip lz4 file tree kmod && rm -rf /var/lib/apt/lists/*' \
     || { docker rm -f seiran-bootstrap >/dev/null 2>&1; die "image bootstrap failed"; }
   docker commit seiran-bootstrap "$TAG" >/dev/null
   docker rm seiran-bootstrap >/dev/null

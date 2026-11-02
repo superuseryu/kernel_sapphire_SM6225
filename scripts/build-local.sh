@@ -207,11 +207,61 @@ if [[ -z $JOBS ]]; then
     if (( JOBS > JCAP )); then JOBS=$JCAP; fi
   fi
 fi
+# memory preflight: RAM + disk swap must cover the link/BTF peak. it only offers a temporary swap file, never forces one.
+# need defaults to 9 GB (heuristic: pahole alone reached ~5 GB RSS before an OOM kill on an 8 GB machine); override: SEIRAN_NEED_GB
+meminfo_mb() { local v; v="$(awk -v k="$1:" '$1==k{print $2}' "${SEIRAN_MEMINFO:-/proc/meminfo}" 2>/dev/null || true)"; echo $(( ${v:-0} / 1024 )); }
+disk_swap_free_mb() { # zram is RAM-backed, so it is not counted as extra memory
+  awk 'NR>1 && $1 !~ /zram/ {f += $3 - $4} END {printf "%d", f / 1024}' "${SEIRAN_SWAPS:-/proc/swaps}" 2>/dev/null || echo 0
+}
+mem_preflight() {
+  local need_mb=$(( ${SEIRAN_NEED_GB:-9} * 1024 )) have_mb avail_mb total_mb lim_mb deficit_mb add_gb
+  local parent dir fs free_mb maxadd S="" undo c dq
+  local -a cmds
+  avail_mb="$(meminfo_mb MemAvailable)"; total_mb="$(meminfo_mb MemTotal)"; lim_mb="$(mem_limit_mb)"
+  have_mb=$avail_mb; if (( MEM_MB > 0 && MEM_MB < have_mb )); then have_mb=$MEM_MB; fi
+  have_mb=$(( have_mb + $(disk_swap_free_mb) ))
+  if (( have_mb >= need_mb )); then
+    say "[mem] ok: ${have_mb} MB RAM+swap usable (the build can need ~$(( need_mb / 1024 )) GB)"; return 0
+  fi
+  warn "[mem] only ${have_mb} MB RAM+swap usable; the build can need ~$(( need_mb / 1024 )) GB (pahole was OOM-killed at ~5 GB RSS on an 8 GB machine)"
+  if (( lim_mb + 64 < total_mb )); then
+    warn "[mem] a container/cgroup limit (${lim_mb} MB) is below the host RAM: raise that limit (e.g. Droidspaces 'Limit memory'); host swap would not lift it"
+    return 0
+  fi
+  deficit_mb=$(( need_mb - have_mb )); add_gb=$(( (deficit_mb + 1023) / 1024 ))
+  parent="$(dirname "$ROOT")"; dir="$parent/.seiran-swap"
+  fs="$(findmnt -no FSTYPE -T "$parent" 2>/dev/null || true)"
+  free_mb="$(df -Pm "$parent" 2>/dev/null | awk 'NR==2{print $4}')"; free_mb=${free_mb:-0}
+  maxadd=$(( free_mb / 1024 - 15 )) # keep 15 GB free for the work dir
+  if (( maxadd < 1 )); then warn "[mem] not enough free disk on $parent (${free_mb} MB) for a swap file"; return 0; fi
+  if (( add_gb > maxadd )); then add_gb=$maxadd; fi
+  case $fs in btrfs|ext4|xfs) ;; *) warn "[mem] no swap file support here for fs '${fs:-unknown}': free memory or add swap by hand"; return 0 ;; esac
+  if [[ -e $dir ]]; then warn "[mem] $dir already exists; remove it first (swapoff $dir/swapfile) or reuse it by hand"; return 0; fi
+  if [[ $EUID != 0 ]]; then command -v sudo >/dev/null 2>&1 || { warn "[mem] needs root or sudo to create swap"; return 0; }; S="sudo"; fi
+  dq="$(printf '%q' "$dir")"
+  if [[ $fs == btrfs ]]; then
+    cmds=("btrfs subvolume create $dq" "btrfs filesystem mkswapfile --size ${add_gb}g $dq/swapfile" "swapon --priority 10 $dq/swapfile")
+    undo="swapoff $dq/swapfile && btrfs subvolume delete $dq"
+  else
+    cmds=("mkdir -p $dq" "fallocate -l ${add_gb}G $dq/swapfile" "chmod 600 $dq/swapfile" "mkswap $dq/swapfile" "swapon --priority 10 $dq/swapfile")
+    undo="swapoff $dq/swapfile && rm -rf $dq"
+  fi
+  say "[mem] plan: a temporary ${add_gb} GB swap file on $fs (not in fstab, gone after reboot):"
+  printf '       %s\n' "${cmds[@]}"
+  if confirm "Create it now?" N; then
+    for c in "${cmds[@]}"; do $S bash -c "$c" || { warn "[mem] failed: $c (continuing without it)"; return 0; }; done
+    say "[mem] swap active. remove later: $S bash -c '$undo'"
+  else
+    say "[mem] skipped, continuing without extra swap"
+  fi
+  if [[ "$(systemctl is-active graphical.target 2>/dev/null || true)" == active ]]; then
+    say "[mem] tip: the desktop typically holds 1-2 GB. over ssh you can stop it for the build: sudo systemctl isolate multi-user.target (unsaved work is lost; undo: sudo systemctl isolate graphical.target)"
+  fi
+  return 0
+}
 if [[ $DRY == 0 ]]; then
   say "[host] $HOST_ARCH | ram ${MEM_MB} MB | cpus $CPUS -> jobs $JOBS"
-  if (( MEM_MB > 0 && MEM_MB < 6144 )); then
-    warn "under ~6 GB RAM the kernel build can get OOM-killed (the link step is usually the peak). raise the container memory limit or use swap"
-  fi
+  mem_preflight
 fi
 have_docker() { command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; }
 glibc_old() { # true when host glibc < 2.36 (neutron needs newer)
@@ -306,4 +356,5 @@ TTY=(); [[ -t 0 && -t 1 ]] && TTY=(-it)
 say "[docker] run $TAG ($PLATFORM)"
 exec docker run --rm --init "${TTY[@]}" --net=host --platform "$PLATFORM" \
   "${SECOPT[@]}" -e OMP_NUM_THREADS="$JOBS" -e OMP_THREAD_LIMIT="$JOBS" \
+  -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' \
   "${MOUNTS[@]}" -w "$REPO" "$TAG" python3 "$REPO/scripts/local-runner.py" "${RARGS[@]}"

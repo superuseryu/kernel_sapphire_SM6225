@@ -7,7 +7,7 @@ set -e
 IMAGE="${WORK_DIR}/out/dist/Image"
 [ -f "$IMAGE" ] || { echo "[ERROR] Image not found: $IMAGE"; exit 1; }
 
-VERSION_FULL=$(strings "$IMAGE" | grep "Linux version 5" | head -1)
+VERSION_FULL=$(strings "$IMAGE" | grep "Linux version [0-9]" | head -1)
 echo "$VERSION_FULL"
 
 echo "$VERSION_FULL" | grep -q "dirty" && { echo "❌ Kernel is dirty!"; exit 1; } || true

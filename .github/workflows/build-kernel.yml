@@ -204,7 +204,7 @@ jobs:
       - name: "Capture uname"
         run: |
           UNAME=$(grep UTS_RELEASE \
-            ${{ env.KERNEL_SRC }}/out/include/generated/utsrelease.h 2>/dev/null \
+            ${{ env.WORK_DIR }}/out/dist/include/generated/utsrelease.h 2>/dev/null \
             | cut -d'"' -f2 || echo "unknown")
           mkdir -p ${{ env.KERNEL_SRC }}/out/dist
           echo "$UNAME" > ${{ env.KERNEL_SRC }}/out/dist/kernel_uname.txt

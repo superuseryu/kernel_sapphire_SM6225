@@ -236,8 +236,20 @@ mem_preflight() {
   if (( maxadd < 1 )); then warn "[mem] not enough free disk on $parent (${free_mb} MB) for a swap file"; return 0; fi
   if (( add_gb > maxadd )); then add_gb=$maxadd; fi
   case $fs in btrfs|ext4|xfs) ;; *) warn "[mem] no swap file support here for fs '${fs:-unknown}': free memory or add swap by hand"; return 0 ;; esac
-  if [[ -e $dir ]]; then warn "[mem] $dir already exists; remove it first (swapoff $dir/swapfile) or reuse it by hand"; return 0; fi
-  if [[ $EUID != 0 ]]; then command -v sudo >/dev/null 2>&1 || { warn "[mem] needs root or sudo to create swap"; return 0; }; S="sudo"; fi
+  if [[ $EUID != 0 ]]; then command -v sudo >/dev/null 2>&1 || { warn "[mem] needs root or sudo to use swap"; return 0; }; S="sudo"; fi
+  if [[ -e $dir/swapfile ]]; then # left by an earlier run: the file survives a reboot, only the swapon is lost
+    if grep -qs -F "$dir/swapfile" "${SEIRAN_SWAPS:-/proc/swaps}"; then
+      warn "[mem] $dir/swapfile is already active and still not enough: free memory or add swap by hand"; return 0
+    fi
+    say "[mem] found an inactive swap file: $dir/swapfile"
+    if confirm "Reactivate it now?" N; then
+      $S swapon --priority 10 "$dir/swapfile" && say "[mem] swap reactivated" || warn "[mem] swapon failed (continuing without it)"
+    else
+      say "[mem] skipped, continuing without extra swap"
+    fi
+    return 0
+  fi
+  if [[ -e $dir ]]; then warn "[mem] $dir exists without a swapfile: remove it by hand"; return 0; fi
   dq="$(printf '%q' "$dir")"
   if [[ $fs == btrfs ]]; then
     cmds=("btrfs subvolume create $dq" "btrfs filesystem mkswapfile --size ${add_gb}g $dq/swapfile" "swapon --priority 10 $dq/swapfile")
@@ -246,7 +258,7 @@ mem_preflight() {
     cmds=("mkdir -p $dq" "fallocate -l ${add_gb}G $dq/swapfile" "chmod 600 $dq/swapfile" "mkswap $dq/swapfile" "swapon --priority 10 $dq/swapfile")
     undo="swapoff $dq/swapfile && rm -rf $dq"
   fi
-  say "[mem] plan: a temporary ${add_gb} GB swap file on $fs (not in fstab, gone after reboot):"
+  say "[mem] plan: a temporary ${add_gb} GB swap file on $fs (not in fstab: swapon is lost on reboot, the file stays until you remove it):"
   printf '       %s\n' "${cmds[@]}"
   if confirm "Create it now?" N; then
     for c in "${cmds[@]}"; do $S bash -c "$c" || { warn "[mem] failed: $c (continuing without it)"; return 0; }; done

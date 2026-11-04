@@ -19,6 +19,7 @@
 | `CONFIG_CFG80211=y` | Must be `=m` — Qualcomm `wlan.ko` module dep chain |
 | `CONFIG_MAC80211=y` | Same as `CFG80211` |
 | `CONFIG_IP_TABLES=y` | Must be `=m` — `netd` expects `modprobe` |
+| `CONFIG_TIPC=n` | Bootloop at boot animation on SM6225 (kernel boots, Android init reaches SurfaceFlinger, stuck at early animation frames then reboots) — bisect confirmed; root cause unknown, suspected vendor HAL or system service implicit TIPC socket dependency |
 
 ## Safe to disable
 

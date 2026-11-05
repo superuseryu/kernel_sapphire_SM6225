@@ -12,7 +12,7 @@ CF="$DEFCONFIG"
 
 # Base cleanup
 sed -i 's/ cgroup_disable=pressure//'                    "$CF"
-sed -i 's/CONFIG_CMDLINE="/&slub_debug=- page_owner=off noirqdebug /' "$CF"
+sed -i 's/CONFIG_CMDLINE="/&slub_debug=- page_owner=off noirqdebug mitigations=off /' "$CF"
 sed -i 's/kasan\.stacktrace=off/kasan=off/'               "$CF"
 sed -i 's/CONFIG_CMDLINE="\(.*\)"/CONFIG_CMDLINE="\1 sched_util_clamp_min_rt_default=640 transparent_hugepage=madvise audit=0 rcu_nocbs=4-7"/' "$CF"
 
@@ -117,13 +117,6 @@ CONFIG_MACVLAN=y
 CONFIG_USER_NS=y
 CONFIG_KFENCE_DEFERRABLE=y
 # CONFIG_LOCALVERSION_AUTO is not set
-CONFIG_RANDOMIZE_KSTACK_OFFSET_DEFAULT=y
-CONFIG_INIT_ON_FREE_DEFAULT_ON=y
-# CONFIG_LDISC_AUTOLOAD is not set
-# CONFIG_BINFMT_MISC is not set
-CONFIG_ARCH_MMAP_RND_COMPAT_BITS=16
-CONFIG_MAGIC_SYSRQ_DEFAULT_ENABLE=0x0
-# CONFIG_MAGIC_SYSRQ_SERIAL is not set
 EOF
 
 # KSU-Next

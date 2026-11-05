@@ -176,6 +176,11 @@ if [ -n "$ATH9K_COMMON_KO" ]; then
   cp "$ATH9K_COMMON_KO" "$KO_OUT/ath9k_common.ko"
   echo "[${SOURCE_TYPE^^}] Collecting ath9k_common.ko..."
 fi
+RTL8188GU_KO=$(find "$MODULES_OUT" -name '8188gu.ko' | head -1)
+if [ -n "$RTL8188GU_KO" ]; then
+  cp "$RTL8188GU_KO" "$KO_OUT/8188gu.ko"
+  echo "[${SOURCE_TYPE^^}] Collecting 8188gu.ko..."
+fi
 
 DURATION=$(( $(date +%s) - START ))
 echo "✅ Build done in $((DURATION/60))m $((DURATION%60))s"

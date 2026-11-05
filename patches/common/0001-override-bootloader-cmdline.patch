@@ -1,0 +1,73 @@
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index 8d9f6f0771cfa..1ed18c62cf8b2 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -1159,6 +1159,60 @@ static const char *config_cmdline = CONFIG_CMDLINE;
+ static const char *config_cmdline = "";
+ #endif
+ 
++/*
++ * Drop unwanted tokens from the DT/bootloader part of the command line
++ * only, so CONFIG_CMDLINE entries are never touched.
++ */
++static const char * const sapphire_dt_strip[] = {
++	"kasan=",
++	"cpufreq.default_governor=",
++	"rcu_nocbs=",
++	"loglevel=",
++	"log_buf_len=",
++	"console=",
++	"earlycon=",
++	"msm_rtb.filter=",
++	"disable_dma32=",
++	"ftrace_dump_on_oops",
++	"silent_boot.mode=",
++};
++
++static void __init sapphire_strip_dt_args(char *s)
++{
++	char *rd = s, *wr = s;
++
++	while (*rd) {
++		size_t len, n, i;
++		bool drop = false;
++
++		while (*rd == ' ')
++			rd++;
++		if (!*rd)
++			break;
++
++		len = strcspn(rd, " ");
++		for (i = 0; i < ARRAY_SIZE(sapphire_dt_strip); i++) {
++			const char *k = sapphire_dt_strip[i];
++			bool exact;
++
++			n = strlen(k);
++			exact = k[n - 1] != '=';
++			if (exact ? (len == n && !strncmp(rd, k, n)) :
++					!strncmp(rd, k, n))
++				drop = true;
++		}
++
++		if (!drop) {
++			if (wr != s)
++				*wr++ = ' ';
++			memmove(wr, rd, len);
++			wr += len;
++		}
++		rd += len;
++	}
++	*wr = '\0';
++}
++
+ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
+ 				     int depth, void *data)
+ {
+@@ -1196,6 +1250,7 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
+ 			copy_len = min((int)l, copy_len);
+ 			strncpy(cmdline + cmdline_len, p, copy_len);
+ 			cmdline[cmdline_len + copy_len] = '\0';
++			sapphire_strip_dt_args(cmdline + cmdline_len);
+ 		} else {
+ 			strlcpy(cmdline, p, min(l, COMMAND_LINE_SIZE));
+ 		}

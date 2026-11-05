@@ -14,7 +14,7 @@ CF="$DEFCONFIG"
 sed -i 's/ cgroup_disable=pressure//'                    "$CF"
 sed -i 's/CONFIG_CMDLINE="/&slub_debug=- page_owner=off noirqdebug mitigations=off /' "$CF"
 sed -i 's/kasan\.stacktrace=off/kasan=off/'               "$CF"
-sed -i 's/CONFIG_CMDLINE="\(.*\)"/CONFIG_CMDLINE="\1 sched_util_clamp_min_rt_default=640 transparent_hugepage=madvise audit=0 rcu_nocbs=4-7"/' "$CF"
+sed -i 's/CONFIG_CMDLINE="\(.*\)"/CONFIG_CMDLINE="\1 transparent_hugepage=madvise audit=0 rcu_nocbs=4-7 silent_boot.mode=silent"/' "$CF"
 
 # Strip symbols already in base defconfig to avoid "reassigning" warnings
 for SYM in WLAN_VENDOR_ATH \

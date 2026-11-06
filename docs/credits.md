@@ -22,13 +22,22 @@
 - **[pershoot](https://github.com/pershoot/KernelSU-Next)** — KSU-Next & SUSFS fork
 - **[KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next)** — KSU-Next implementation
 - **[BakaSU](https://github.com/Baka-SU/BakaSU)** — BakaSU implementation
-- 
 - **[simonpunk](https://gitlab.com/simonpunk/susfs4ksu)** — SUSFS4KSU patches
 - **[sidex15](https://github.com/sidex15/susfs4ksu-module)** — SUSFS systemless module
 - **[ravindu644](https://github.com/ravindu644/droidspaces)** — Droidspaces
 - **[vc-teahouse](https://github.com/vc-teahouse/Baseband-guard)** — Baseband Guard
 - **[osm0sis](https://github.com/osm0sis/AnyKernel3)** — AnyKernel3
 - **[CodeLinaro](https://git.codelinaro.org/)** — Qualcomm kernel source upstream
+- **[TweetNaCl](https://tweetnacl.cr.yp.to/)** — Daniel J. Bernstein et al., Ed25519 verification for signed zips (`scripts/signing/`)
+
+---
+
+## Inspiration
+
+Design inspiration only. No code is taken from these projects.
+
+- **[AZenith](https://github.com/Liliya2727/AZenith)** — Liliya2727 (copyright Zexshia, ArchHaven Devs), app-style home screen and structure
+- **[Duck Detector Refactoring](https://github.com/eltavine/Duck-Detector-Refactoring)** — eltavine, contributors page idea
 
 ---
 

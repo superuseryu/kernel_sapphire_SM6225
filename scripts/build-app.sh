@@ -17,13 +17,12 @@ fi
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 ( umask 077; printf '%s' "$SEIRAN_APP_KS_B64" | base64 -d > "$T/ks.jks" )
 
-if ! command -v gradle >/dev/null 2>&1; then
-  U="https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"
-  curl -fsSL -o "$T/gradle.zip" "$U"
-  echo "$(curl -fsSL "$U.sha256")  $T/gradle.zip" | sha256sum -c -
-  unzip -q "$T/gradle.zip" -d "$T"
-  export PATH="$T/gradle-${GRADLE_VERSION}/bin:$PATH"
-fi
+# Always use the pinned Gradle, not whatever the runner image ships
+U="https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"
+curl -fsSL -o "$T/gradle.zip" "$U"
+echo "$(curl -fsSL "$U.sha256")  $T/gradle.zip" | sha256sum -c -
+unzip -q "$T/gradle.zip" -d "$T"
+export PATH="$T/gradle-${GRADLE_VERSION}/bin:$PATH"
 
 SEIRAN_APP_KS_FILE="$T/ks.jks" SEIRAN_APP_KS_PASS="$SEIRAN_APP_KS_PASS" \
   gradle --no-daemon -p "$ROOT/app" assembleRelease
@@ -36,8 +35,9 @@ SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 SIGNER=""
 [ -n "$SDK" ] && SIGNER="$(find "$SDK/build-tools" -name apksigner 2>/dev/null | sort -V | tail -1)"
 if [ -n "$SIGNER" ]; then
-  FP="$("$SIGNER" verify --print-certs "${apks[0]}" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr -d ' ')"
-  [ "$FP" = "$EXPECT_FP" ] || { echo "[ERROR] app cert mismatch: $FP"; exit 1; }
+  AS_OUT="$("$SIGNER" verify --print-certs "${apks[0]}" 2>&1)" || { echo "[ERROR] apksigner verify failed"; echo "$AS_OUT"; exit 1; }
+  FP="$(printf '%s\n' "$AS_OUT" | grep -i 'SHA-256 digest' | head -1 | sed 's/.*: *//' | tr -d ' :' | tr 'A-Z' 'a-z' || true)"
+  [ "$FP" = "$EXPECT_FP" ] || { echo "[ERROR] app cert mismatch: '$FP'"; echo "$AS_OUT"; exit 1; }
   echo "[OK] app cert $FP"
 else
   echo "[WARN] apksigner not found, signer not verified"

@@ -5,6 +5,9 @@
 - Haze by Chris Banes, Apache-2.0: https://github.com/chrisbanes/haze
 - MaterialKolor by Jordon de Hoog, MIT: https://github.com/jordond/MaterialKolor
 
+The full Apache-2.0 text for the Apache-licensed items above is reproduced below,
+under the material-color-utilities section.
+
 The screen layout is inspired by AZenith (Apache-2.0). No code was copied.
 
 ## Launcher icon

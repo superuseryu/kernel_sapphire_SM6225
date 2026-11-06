@@ -7,7 +7,7 @@ The screen layout is inspired by AZenith (Apache-2.0). No code was copied.
 
 ## Iconoir
 
-The launcher icon glyph (electronics-chip) is from Iconoir, MIT license:
+The launcher icon glyph (git-commit) is from Iconoir, MIT license:
 https://github.com/iconoir-icons/iconoir
 
 MIT License
@@ -31,3 +31,9 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Contributor avatars
+
+The pictures in app/src/main/assets/avatars are the GitHub profile pictures of the
+people and projects listed in docs/credits.json, resized to 96 px. They remain the
+property of their owners and can be removed on request.

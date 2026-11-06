@@ -38,6 +38,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import kotlin.concurrent.thread
 
 @Composable
@@ -65,38 +68,60 @@ fun SeiranApp() {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var stats by remember { mutableStateOf<Stats?>(null) }
     var rootOk by remember { mutableStateOf(false) }
-    val wantRoot = remember { sp.getBoolean("use_root", false) }
+    var checking by remember { mutableStateOf(true) }
+    var onboarded by remember { mutableStateOf(sp.getBoolean("onboarded", false)) }
 
-    // Reload whenever Home is shown. Root is only requested if it was granted before.
-    LaunchedEffect(tab) {
-        if (tab == 0) {
-            val ask = rootOk || wantRoot
-            thread {
-                val r = ask && Sys.grantRoot()
-                rootOk = r
-                stats = Sys.load(r)
-            }
+    // Root is required. The check runs at launch, on demand, and again
+    // whenever the app returns to the foreground while root is missing.
+    val runCheck: () -> Unit = {
+        checking = true
+        thread {
+            val r = recheckRoot()
+            rootOk = r
+            checking = false
         }
     }
 
-    val onGrantRoot: () -> Unit = {
-        thread {
-            val r = Sys.grantRoot()
-            rootOk = r
-            if (r) sp.edit().putBoolean("use_root", true).apply()
-            stats = Sys.load(r)
+    LaunchedEffect(Unit) { runCheck() }
+
+    DisposableEffect(activity) {
+        val obs = object : LifecycleEventObserver {
+            override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
+                if (event == Lifecycle.Event.ON_RESUME && !rootOk && !checking) runCheck()
+            }
         }
+        activity.lifecycle.addObserver(obs)
+        onDispose { activity.lifecycle.removeObserver(obs) }
+    }
+
+    LaunchedEffect(tab, rootOk) {
+        if (tab == 0 && rootOk) thread { stats = Sys.load(true) }
     }
 
     SeiranTheme(theme, dark) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Box(Modifier.fillMaxSize()) {
-                if (tab == 0) {
-                    HomeScreen(stats, rootOk, onGrantRoot)
+                if (!onboarded) {
+                    Onboarding(
+                        theme = theme,
+                        rootOk = rootOk,
+                        checking = checking,
+                        onGrant = runCheck,
+                        onFinish = {
+                            sp.edit().putBoolean("onboarded", true).apply()
+                            onboarded = true
+                        },
+                    )
+                } else if (!rootOk) {
+                    RootGate(checking = checking, onGrant = runCheck)
                 } else {
-                    SettingsScreen(theme)
+                    if (tab == 0) {
+                        HomeScreen(stats, true, runCheck)
+                    } else {
+                        SettingsScreen(theme)
+                    }
+                    NavPill(tab, { tab = it }, Modifier.align(Alignment.BottomCenter))
                 }
-                NavPill(tab, { tab = it }, Modifier.align(Alignment.BottomCenter))
             }
         }
     }

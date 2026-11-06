@@ -41,6 +41,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.hazeBlur
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import kotlin.concurrent.thread
 
 @Composable
@@ -98,6 +104,8 @@ fun SeiranApp() {
         if (tab == 0 && rootOk) thread { stats = Sys.load(true) }
     }
 
+    val hazeState = rememberHazeState()
+
     SeiranTheme(theme, dark) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Box(Modifier.fillMaxSize()) {
@@ -115,12 +123,19 @@ fun SeiranApp() {
                 } else if (!rootOk) {
                     RootGate(checking = checking, onGrant = runCheck)
                 } else {
-                    if (tab == 0) {
-                        HomeScreen(stats, true, runCheck)
-                    } else {
-                        SettingsScreen(theme)
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .hazeSource(hazeState)
+                            .background(MaterialTheme.colorScheme.background),
+                    ) {
+                        if (tab == 0) {
+                            HomeScreen(stats, true, runCheck)
+                        } else {
+                            SettingsScreen(theme)
+                        }
                     }
-                    NavPill(tab, { tab = it }, Modifier.align(Alignment.BottomCenter))
+                    NavPill(tab, { tab = it }, hazeState, Modifier.align(Alignment.BottomCenter))
                 }
             }
         }
@@ -128,15 +143,19 @@ fun SeiranApp() {
 }
 
 @Composable
-private fun NavPill(tab: Int, onSelect: (Int) -> Unit, modifier: Modifier) {
+private fun NavPill(tab: Int, onSelect: (Int) -> Unit, hazeState: HazeState, modifier: Modifier) {
+    val pillShape = RoundedCornerShape(32.dp)
+    val blur = remember { HazeBlurStyle { blurRadius(24.dp) } }
     Surface(
         modifier = modifier
             .navigationBarsPadding()
-            .padding(bottom = 12.dp),
-        shape = RoundedCornerShape(32.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        tonalElevation = 6.dp,
-        shadowElevation = 6.dp,
+            .padding(bottom = 12.dp)
+            .clip(pillShape)
+            .hazeBlur(input = HazeInput.Sources(hazeState), style = blur),
+        shape = pillShape,
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
     ) {
         Row(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             NavItem(Icons.Filled.Home, "Home", tab == 0) { onSelect(0) }

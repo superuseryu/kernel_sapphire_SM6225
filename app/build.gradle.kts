@@ -51,4 +51,7 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.compose.material:material-icons-core")
     implementation("com.github.topjohnwu.libsu:core:6.0.0")
+    implementation("com.materialkolor:material-kolor:4.1.1")
+    implementation("dev.chrisbanes.haze:haze:2.0.1")
+    implementation("dev.chrisbanes.haze:haze-blur:2.0.1")
 }

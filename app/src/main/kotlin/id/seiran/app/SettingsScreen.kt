@@ -3,7 +3,16 @@
 package id.seiran.app
 
 import android.os.Build
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -72,6 +81,7 @@ fun SettingsScreen(theme: ThemeState) {
             theme.amoled,
             true,
         ) { theme.setAmoled(it) }
+        KeyColorCard(theme)
     }
 }
 
@@ -104,6 +114,52 @@ private fun SwitchRow(
                 )
             }
             Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+        }
+    }
+}
+
+@Composable
+private fun KeyColorCard(theme: ThemeState) {
+    val active = !(theme.dynamic && Build.VERSION.SDK_INT >= 31)
+    val colors = listOf(0xFF5FA8C2, 0xFF6750A4, 0xFF4C8C4A, 0xFFE07B39, 0xFFD6638F, 0xFF3B6FD4)
+        .map { it.toInt() }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (active) 1f else 0.38f),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column {
+                Text("Key color", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Used when Dynamic color is off",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                colors.forEach { c ->
+                    val picked = theme.seed == c
+                    Box(
+                        Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color(c))
+                            .then(
+                                if (picked) {
+                                    Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                } else {
+                                    Modifier
+                                },
+                            )
+                            .clickable(enabled = active) { theme.setSeed(c) },
+                    )
+                }
+            }
         }
     }
 }

@@ -3,43 +3,6 @@ MODDIR=${0%/*}
 IW="${MODDIR}/tools/iw"
 MDIR="${MODDIR}/module"
 
-# -- Status (always) --
-if [ -f /sys/block/zram0/recomp_algorithm ]; then
-  echo "zram multi-comp: active"
-  echo "recomp_algorithm: $(cat /sys/block/zram0/recomp_algorithm)"
-  echo "comp_algorithm:   $(cat /sys/block/zram0/comp_algorithm)"
-else
-  echo "zram multi-comp: not active"
-fi
-echo "cpuidle: $(cat /sys/devices/system/cpu/cpuidle/current_governor 2>/dev/null || echo unknown)"
-echo "I/O scheduler: $(cat $(find /sys/block/sd*/queue/scheduler 2>/dev/null | head -1) 2>/dev/null | grep -oE '\[[^]]+\]' | tr -d '[]' || echo unknown)"
-echo "cpufreq policy0: $(cat /sys/devices/system/cpu/cpufreq/policy0/scaling_governor 2>/dev/null || echo unknown)"
-echo "cpufreq policy4: $(cat /sys/devices/system/cpu/cpufreq/policy4/scaling_governor 2>/dev/null || echo unknown)"
-
-# -- Battery & storage health --
-FULL=$(cat /sys/class/power_supply/battery/charge_full 2>/dev/null)
-DESIGN=$(cat /sys/class/power_supply/battery/charge_full_design 2>/dev/null)
-if [ -n "$FULL" ] && [ -n "$DESIGN" ] && [ "$DESIGN" -gt 0 ]; then
-  FULL_MAH=$((FULL/1000))
-  DESIGN_MAH=$((DESIGN/1000))
-  WEAR=$((DESIGN_MAH-FULL_MAH))
-  HEALTH=$((FULL*100/DESIGN))
-  HEALTH_DEC=$(((FULL*1000/DESIGN)%10))
-  echo "battery: ${FULL_MAH}/${DESIGN_MAH} mAh | wear: ${WEAR} mAh | health: ${HEALTH}.${HEALTH_DEC}%"
-else
-  echo "battery: unavailable"
-fi
-UFS_BASE=/sys/devices/platform/soc/4804000.ufshc/health_descriptor
-LTA=$(cat ${UFS_BASE}/life_time_estimation_a 2>/dev/null)
-LTB=$(cat ${UFS_BASE}/life_time_estimation_b 2>/dev/null)
-if [ -n "$LTA" ] && [ -n "$LTB" ]; then
-  echo "ufs: slot A $LTA | slot B $LTB"
-else
-  echo "ufs health: unavailable"
-fi
-echo "mem_sleep: $(cat /sys/power/mem_sleep 2>/dev/null || echo unknown)"
-echo ""
-
 # -- Dongle status --
 DONGLE_CONNECTED=0
 lsusb 2>/dev/null | grep -q "0cf3:9271" && DONGLE_CONNECTED=1
@@ -51,6 +14,7 @@ lsusb 2>/dev/null | grep -qE "0bda:b711|0bda:2005" && RTL8188GU_CONNECTED=1
 RTL8188GU_LOADED=0
 lsmod | grep -q "^8188gu" && RTL8188GU_LOADED=1
 
+if [ $DONGLE_CONNECTED -eq 1 ] || [ $ATH9K_LOADED -eq 1 ] || [ $RTL8188GU_CONNECTED -eq 1 ] || [ $RTL8188GU_LOADED -eq 1 ]; then
 echo "dongle (0cf3:9271 / AR9271): $([ $DONGLE_CONNECTED -eq 1 ] && echo 'connected' || echo 'not connected')"
 echo "ath9k_htc: $([ $ATH9K_LOADED -eq 1 ] && echo 'loaded' || echo 'not loaded')"
 echo "dongle (0bda:b711|2005 / RTL8188GU): $([ $RTL8188GU_CONNECTED -eq 1 ] && echo 'connected' || echo 'not connected')"
@@ -60,6 +24,7 @@ echo "mac80211: $(lsmod | grep -q '^mac80211' && echo 'loaded' || echo 'not load
 echo "wlan: $(lsmod | grep -q '^wlan' && echo 'loaded' || echo 'not loaded')"
 echo "wlan0/wlan0mon: $(ip link show 2>/dev/null | grep -qE 'wlan0|wlan0mon' && echo 'up/present' || echo 'not present')"
 echo ""
+fi
 
 
 # -- Smart toggle (no arg) --

@@ -25,16 +25,19 @@ class ThemeState(private val sp: SharedPreferences) {
     var amoled by mutableStateOf(sp.getBoolean("amoled", false))
         private set
 
+    @JvmName("applyMode")
     fun setMode(v: Int) {
         mode = v
         sp.edit().putInt("theme_mode", v).apply()
     }
 
+    @JvmName("applyDynamic")
     fun setDynamic(v: Boolean) {
         dynamic = v
         sp.edit().putBoolean("dynamic", v).apply()
     }
 
+    @JvmName("applyAmoled")
     fun setAmoled(v: Boolean) {
         amoled = v
         sp.edit().putBoolean("amoled", v).apply()

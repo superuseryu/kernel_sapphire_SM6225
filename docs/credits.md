@@ -30,6 +30,7 @@
 - **[CodeLinaro](https://git.codelinaro.org/)** — Qualcomm kernel source upstream
 - **[TweetNaCl](https://tweetnacl.cr.yp.to/)** — Daniel J. Bernstein et al., Ed25519 verification for signed zips (`scripts/signing/`)
 - **[Flaticon](https://www.flaticon.com/free-icon/paw_8277564)** — launcher icon paw by Mihimihi (Flaticon license, attribution)
+- **Banner art** — artist unknown, found online, not covered by this repository's license. If it is yours, contact [t.me/home_yu_chat](https://t.me/home_yu_chat) for credit or removal
 - **[libsu](https://github.com/topjohnwu/libsu)** — root shell library used by the app (Apache-2.0)
 - **[Haze](https://github.com/chrisbanes/haze)** — blur for the nav pill (Apache-2.0)
 - **[MaterialKolor](https://github.com/jordond/MaterialKolor)** — key color theme generation (MIT)

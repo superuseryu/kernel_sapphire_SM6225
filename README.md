@@ -21,6 +21,7 @@ Automated kernel builder for **Redmi Note 13 4G/NFC (sapphire/sapphiren)** — `
 - [CI / Fork Setup](docs/ci.md)
 - [About](docs/about.md)
 - [Credits](docs/credits.md)
+- [Notices](app/NOTICE.md)
 
 ---
 
@@ -29,6 +30,8 @@ Automated kernel builder for **Redmi Note 13 4G/NFC (sapphire/sapphiren)** — `
 Unless noted otherwise, this repository is under the GNU GPL v2 (see [LICENSE](LICENSE)).
 
 The Android app in `app/` is licensed under the Apache License 2.0 (see [app/LICENSE](app/LICENSE)), Copyright 2026 yurika-sudo. Third-party assets keep their own licenses, see [app/NOTICE.md](app/NOTICE.md).
+
+The banner image and the contributor avatars are not covered by these licenses. They remain the property of their owners and can be removed on request, see the same file.
 
 ---
 

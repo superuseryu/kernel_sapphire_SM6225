@@ -20,17 +20,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
 fun SettingsScreen(theme: ThemeState) {
-    var showWall by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -77,24 +72,6 @@ fun SettingsScreen(theme: ThemeState) {
             theme.amoled,
             true,
         ) { theme.setAmoled(it) }
-        Card(
-            onClick = { showWall = true },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            ),
-        ) {
-            Column(Modifier.padding(16.dp)) {
-                Text("Contributors", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "People and projects Seiran builds on",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        if (showWall) ContributorsDialog { showWall = false }
     }
 }
 

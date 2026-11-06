@@ -11,10 +11,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -164,26 +168,35 @@ private fun ContributorWall(people: List<Person>, onSelect: (Person) -> Unit, mo
 }
 
 @Composable
-fun ContributorsDialog(onDismiss: () -> Unit) {
+fun ContributorsSection(modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
     val uri = LocalUriHandler.current
     var people by remember { mutableStateOf<List<Person>>(emptyList()) }
     var picked by remember { mutableStateOf<Person?>(null) }
     LaunchedEffect(Unit) { thread { people = loadPeople(ctx.applicationContext) } }
 
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Column(Modifier.fillMaxSize().systemBarsPadding().padding(24.dp)) {
-                Text("Contributors", style = MaterialTheme.typography.displaySmall)
-                Text(
-                    "Pinch to zoom, drag to move, tap a face for details.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
-                )
-                ContributorWall(people, { picked = it }, Modifier.weight(1f).fillMaxWidth())
-                Button(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) { Text("Close") }
-            }
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Contributors", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "People and projects Seiran builds on. Pinch, drag, tap a face.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            ContributorWall(
+                people,
+                { picked = it },
+                Modifier
+                    .fillMaxWidth()
+                    .height(340.dp)
+                    .padding(top = 8.dp),
+            )
         }
     }
 

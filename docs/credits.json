@@ -1,0 +1,130 @@
+{
+  "maintainer": {
+    "name": "superuseryu",
+    "description": "kernel maintainer for sapphire/n (Snapdragon 685 / SM6225)",
+    "github": "superuseryu",
+    "telegram_text": "t.me/home_yu_chat",
+    "telegram_url": "https://t.me/home_yu_chat"
+  },
+  "credits": [
+    {
+      "name": "topnotchfreaks",
+      "url": "https://github.com/topnotchfreaks",
+      "description": "workflow reference & early learning",
+      "github": "topnotchfreaks"
+    },
+    {
+      "name": "chkndrp",
+      "url": "https://github.com/chkndrp",
+      "description": "kernel patch reference",
+      "github": "chkndrp"
+    },
+    {
+      "name": "Pzqqt",
+      "url": "https://github.com/Pzqqt",
+      "description": "backport kernel patch reference",
+      "github": "Pzqqt"
+    },
+    {
+      "name": "Steambot12",
+      "url": "https://github.com/Steambot12",
+      "description": "backport kernel patch reference",
+      "github": "Steambot12"
+    },
+    {
+      "name": "firelzrd",
+      "url": "https://github.com/firelzrd",
+      "description": "reference for backport kernel",
+      "github": "firelzrd"
+    },
+    {
+      "name": "The Wild James",
+      "url": "https://github.com/TheWildJames",
+      "description": "kernel patches & build pipeline reference *(used with permission)*",
+      "github": "TheWildJames"
+    },
+    {
+      "name": "maxsteeel",
+      "url": "https://github.com/maxsteeel/nomount",
+      "description": "NoMount",
+      "github": "maxsteeel"
+    },
+    {
+      "name": "pershoot",
+      "url": "https://github.com/pershoot/KernelSU-Next",
+      "description": "KSU-Next & SUSFS fork",
+      "github": "pershoot"
+    },
+    {
+      "name": "KernelSU-Next",
+      "url": "https://github.com/KernelSU-Next/KernelSU-Next",
+      "description": "KSU-Next implementation",
+      "github": "KernelSU-Next"
+    },
+    {
+      "name": "BakaSU",
+      "url": "https://github.com/Baka-SU/BakaSU",
+      "description": "BakaSU implementation",
+      "github": "Baka-SU"
+    },
+    {
+      "name": "simonpunk",
+      "url": "https://gitlab.com/simonpunk/susfs4ksu",
+      "description": "SUSFS4KSU patches",
+      "github": null
+    },
+    {
+      "name": "sidex15",
+      "url": "https://github.com/sidex15/susfs4ksu-module",
+      "description": "SUSFS systemless module",
+      "github": "sidex15"
+    },
+    {
+      "name": "ravindu644",
+      "url": "https://github.com/ravindu644/droidspaces",
+      "description": "Droidspaces",
+      "github": "ravindu644"
+    },
+    {
+      "name": "vc-teahouse",
+      "url": "https://github.com/vc-teahouse/Baseband-guard",
+      "description": "Baseband Guard",
+      "github": "vc-teahouse"
+    },
+    {
+      "name": "osm0sis",
+      "url": "https://github.com/osm0sis/AnyKernel3",
+      "description": "AnyKernel3",
+      "github": "osm0sis"
+    },
+    {
+      "name": "CodeLinaro",
+      "url": "https://git.codelinaro.org/",
+      "description": "Qualcomm kernel source upstream",
+      "github": null
+    },
+    {
+      "name": "TweetNaCl",
+      "url": "https://tweetnacl.cr.yp.to/",
+      "description": "Daniel J. Bernstein et al., Ed25519 verification for signed zips (`scripts/signing/`)",
+      "github": null
+    }
+  ],
+  "inspiration": {
+    "intro": "Design inspiration only. No code is taken from these projects.",
+    "entries": [
+      {
+        "name": "AZenith",
+        "url": "https://github.com/Liliya2727/AZenith",
+        "description": "Liliya2727 (copyright Zexshia, ArchHaven Devs), app-style home screen and structure",
+        "github": "Liliya2727"
+      },
+      {
+        "name": "Duck Detector Refactoring",
+        "url": "https://github.com/eltavine/Duck-Detector-Refactoring",
+        "description": "eltavine, contributors page idea",
+        "github": "eltavine"
+      }
+    ]
+  }
+}

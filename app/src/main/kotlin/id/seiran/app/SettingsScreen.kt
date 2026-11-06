@@ -180,7 +180,7 @@ private fun CreditsCard() {
             listOf(
                 "Launcher icon: Paw by Mihimihi, from Flaticon (flaticon.com)",
                 "Blur: Haze by Chris Banes (Apache-2.0)",
-                "Theme colors: MaterialKolor by jordond (MIT)",
+                "Theme colors: MaterialKolor by Jordon de Hoog (MIT)",
             ).forEach {
                 Text(
                     it,

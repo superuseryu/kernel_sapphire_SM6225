@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "id.seiran.app"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "id.seiran.app"

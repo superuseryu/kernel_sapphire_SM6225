@@ -57,6 +57,8 @@ fi
 chmod +x "$STAGE_DIR/customize.sh" "$STAGE_DIR/post-fs-data.sh" "$STAGE_DIR/action.sh"
 [ -f "$STAGE_DIR/service.sh" ] && chmod +x "$STAGE_DIR/service.sh"
 
+bash "$(cd "$(dirname "$0")" && pwd)/signing/ci-sign.sh" "$STAGE_DIR"
+
 rm -f "$OUT_ZIP"
 (cd "$STAGE_DIR" && zip -r9 -q "$OUT_ZIP" . -x ".*")
 

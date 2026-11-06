@@ -184,12 +184,16 @@ jobs:
           NOTIFY_ENABLED: ${{ inputs.notify }}
         run: bash scripts/notify.sh variant-failure
 
+      - name: "Install aarch64 cross compiler (zip signing)"
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+
       - name: "Pack ZIP"
         env:
           ZIP_PREFIX:  ${{ inputs.zip_prefix }}
           KSU_TYPE:    ${{ inputs.ksu_type }}
           BUILD_TYPE:  ${{ inputs.build_type }}
           SOURCE_TYPE: ${{ inputs.source_type }}
+          SEIRAN_SIGN_KEY: ${{ secrets.SEIRAN_SIGN_KEY }}
         run: bash scripts/pack-zip.sh
 
       - name: "Pack Seiran Core module"
@@ -198,6 +202,7 @@ jobs:
           SOURCE_TYPE: ${{ inputs.artifact_name }}
           COMMIT_SHA:  ${{ github.sha }}
           BUILD_NUM:   ${{ github.run_number }}
+          SEIRAN_SIGN_KEY: ${{ secrets.SEIRAN_SIGN_KEY }}
         run: |
           bash scripts/pack-module.sh
 

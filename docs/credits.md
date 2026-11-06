@@ -29,6 +29,8 @@
 - **[osm0sis](https://github.com/osm0sis/AnyKernel3)** — AnyKernel3
 - **[CodeLinaro](https://git.codelinaro.org/)** — Qualcomm kernel source upstream
 - **[TweetNaCl](https://tweetnacl.cr.yp.to/)** — Daniel J. Bernstein et al., Ed25519 verification for signed zips (`scripts/signing/`)
+- **[Iconoir](https://github.com/iconoir-icons/iconoir)** — launcher icon glyph (MIT)
+- **[libsu](https://github.com/topjohnwu/libsu)** — root shell library used by the app (Apache-2.0)
 
 ---
 

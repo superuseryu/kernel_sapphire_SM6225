@@ -108,6 +108,18 @@
       "url": "https://tweetnacl.cr.yp.to/",
       "description": "Daniel J. Bernstein et al., Ed25519 verification for signed zips (`scripts/signing/`)",
       "github": null
+    },
+    {
+      "name": "Iconoir",
+      "url": "https://github.com/iconoir-icons/iconoir",
+      "description": "launcher icon glyph (MIT)",
+      "github": "iconoir-icons"
+    },
+    {
+      "name": "libsu",
+      "url": "https://github.com/topjohnwu/libsu",
+      "description": "root shell library used by the app (Apache-2.0)",
+      "github": "topjohnwu"
     }
   ],
   "inspiration": {

@@ -123,6 +123,7 @@ private fun NavPill(tab: Int, onSelect: (Int) -> Unit, modifier: Modifier) {
 @Composable
 private fun NavItem(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
     val bg = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+    val fg = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
     Row(
         Modifier
             .clip(RoundedCornerShape(24.dp))
@@ -131,10 +132,10 @@ private fun NavItem(icon: ImageVector, label: String, selected: Boolean, onClick
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = label)
+        Icon(icon, contentDescription = label, tint = fg)
         if (selected) {
             Spacer(Modifier.width(8.dp))
-            Text(label)
+            Text(label, color = fg)
         }
     }
 }

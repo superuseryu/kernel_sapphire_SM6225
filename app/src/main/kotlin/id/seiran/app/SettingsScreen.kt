@@ -41,6 +41,7 @@ fun SettingsScreen(theme: ThemeState) {
             modifier = Modifier.padding(top = 16.dp, start = 4.dp),
         )
         Card(
+            modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainer,

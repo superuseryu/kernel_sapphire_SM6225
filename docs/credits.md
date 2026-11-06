@@ -33,7 +33,7 @@
 - **Banner art** — artist unknown, found online, not covered by this repository's license. If it is yours, contact [t.me/home_yu_chat](https://t.me/home_yu_chat) for credit or removal
 - **[libsu](https://github.com/topjohnwu/libsu)** — root shell library used by the app (Apache-2.0)
 - **[Haze](https://github.com/chrisbanes/haze)** — blur for the nav pill (Apache-2.0)
-- **[MaterialKolor](https://github.com/jordond/MaterialKolor)** — key color theme generation (MIT)
+- **[MaterialKolor](https://github.com/jordond/MaterialKolor)** — key color theme generation (MIT); bundles Google's material-color-utilities (Apache-2.0)
 
 ---
 

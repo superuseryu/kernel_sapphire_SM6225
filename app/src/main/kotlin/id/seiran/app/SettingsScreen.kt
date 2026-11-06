@@ -82,6 +82,8 @@ fun SettingsScreen(theme: ThemeState) {
             true,
         ) { theme.setAmoled(it) }
         KeyColorCard(theme)
+        ContributorsSection()
+        CreditsCard()
     }
 }
 
@@ -159,6 +161,32 @@ private fun KeyColorCard(theme: ThemeState) {
                             .clickable(enabled = active) { theme.setSeed(c) },
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreditsCard() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Credits", style = MaterialTheme.typography.titleMedium)
+            listOf(
+                "Launcher icon: Paw by Mihimihi, from Flaticon (flaticon.com)",
+                "Blur: Haze by Chris Banes (Apache-2.0)",
+                "Theme colors: MaterialKolor by jordond (MIT)",
+            ).forEach {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

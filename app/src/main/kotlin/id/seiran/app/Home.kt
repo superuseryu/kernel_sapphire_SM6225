@@ -126,7 +126,6 @@ fun HomeScreen(stats: Stats?, rootOk: Boolean, onGrantRoot: () -> Unit) {
 
         DeviceCard(infoOpen, { infoOpen = !infoOpen }, kernel, version)
         SignerCard()
-        ContributorsSection()
     }
 }
 

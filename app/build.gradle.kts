@@ -15,6 +15,24 @@ android {
         versionName = "0.1"
     }
 
+    signingConfigs {
+        create("release") {
+            val ks = System.getenv("SEIRAN_APP_KS_FILE")
+            if (ks != null) {
+                storeFile = file(ks)
+                storePassword = System.getenv("SEIRAN_APP_KS_PASS")
+                keyAlias = "seiran"
+                keyPassword = System.getenv("SEIRAN_APP_KS_PASS")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
+
     buildFeatures {
         compose = true
     }

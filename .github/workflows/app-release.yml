@@ -1,0 +1,26 @@
+name: "Seiran app (release)"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: "Build release APK"
+        env:
+          SEIRAN_APP_KS_B64: ${{ secrets.SEIRAN_APP_KS_B64 }}
+          SEIRAN_APP_KS_PASS: ${{ secrets.SEIRAN_APP_KS_PASS }}
+        run: bash scripts/build-app.sh "$GITHUB_WORKSPACE/seiran-app.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: seiran-app-release
+          path: seiran-app.apk

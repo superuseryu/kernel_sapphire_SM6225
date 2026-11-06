@@ -196,6 +196,21 @@ jobs:
           SEIRAN_SIGN_KEY: ${{ secrets.SEIRAN_SIGN_KEY }}
         run: bash scripts/pack-zip.sh
 
+      - name: "Setup JDK 21 (Seiran app)"
+        if: endsWith(inputs.artifact_name, '-ksun')
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: "Build Seiran app"
+        if: endsWith(inputs.artifact_name, '-ksun')
+        env:
+          SEIRAN_APP_KS_B64: ${{ secrets.SEIRAN_APP_KS_B64 }}
+          SEIRAN_APP_KS_PASS: ${{ secrets.SEIRAN_APP_KS_PASS }}
+          SEIRAN_APP_APK: ${{ runner.temp }}/seiran-app.apk
+        run: bash scripts/build-app.sh "$SEIRAN_APP_APK"
+
       - name: "Pack Seiran Core module"
         if: endsWith(inputs.artifact_name, '-ksun')
         env:
@@ -203,6 +218,7 @@ jobs:
           COMMIT_SHA:  ${{ github.sha }}
           BUILD_NUM:   ${{ github.run_number }}
           SEIRAN_SIGN_KEY: ${{ secrets.SEIRAN_SIGN_KEY }}
+          SEIRAN_APP_APK: ${{ runner.temp }}/seiran-app.apk
         run: |
           bash scripts/pack-module.sh
 

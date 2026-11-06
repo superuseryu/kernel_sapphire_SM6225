@@ -73,6 +73,8 @@ if [ -z "$1" ]; then
   elif [ $RTL8188GU_CONNECTED -eq 0 ] && [ $RTL8188GU_LOADED -eq 1 ]; then
     set -- deactivate-rtl
   else
+    echo ">> Nothing to toggle, launching Seiran..."
+    am start --user 0 -n id.seiran.app/.MainActivity >/dev/null 2>&1 || echo "!! Seiran app not installed"
     exit 0
   fi
 fi

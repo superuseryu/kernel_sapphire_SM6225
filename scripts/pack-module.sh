@@ -57,6 +57,11 @@ fi
 chmod +x "$STAGE_DIR/customize.sh" "$STAGE_DIR/post-fs-data.sh" "$STAGE_DIR/action.sh"
 [ -f "$STAGE_DIR/service.sh" ] && chmod +x "$STAGE_DIR/service.sh"
 
+# Seiran app: goes in before signing so it is covered by the hash list
+[ -f "${SEIRAN_APP_APK:-}" ] || { echo "[ERROR] SEIRAN_APP_APK not set or missing"; exit 1; }
+mkdir -p "$STAGE_DIR/app"
+cp "$SEIRAN_APP_APK" "$STAGE_DIR/app/seiran.apk"
+
 bash "$(cd "$(dirname "$0")" && pwd)/signing/ci-sign.sh" "$STAGE_DIR"
 
 rm -f "$OUT_ZIP"

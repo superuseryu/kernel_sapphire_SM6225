@@ -8,7 +8,15 @@ unzip -o "$ZIPFILE" -d "$V" >&2 || abort "! unzip failed"
 chmod 755 "$V/seiran-verify/verify"
 sh "$V/seiran-verify/verify-zip.sh" "$V" || abort "! Verification failed. Download the official release again."
 ui_print "- Signature OK, installing"
-unzip -o "$ZIPFILE" -x 'seiran-verify/*' SHA256SUMS SHA256SUMS.sig -d "$MODPATH" >&2
+# Install the bundled app from the verified copy, never from MODPATH
+if [ -f "$V/app/seiran.apk" ]; then
+  cp "$V/app/seiran.apk" /data/local/tmp/seiran-app.apk
+  chmod 644 /data/local/tmp/seiran-app.apk
+  PM_OUT=$(pm install -r -d --user 0 /data/local/tmp/seiran-app.apk 2>&1)
+  ui_print "- Seiran app: $PM_OUT"
+  rm -f /data/local/tmp/seiran-app.apk
+fi
+unzip -o "$ZIPFILE" -x 'seiran-verify/*' 'app/*' SHA256SUMS SHA256SUMS.sig -d "$MODPATH" >&2
 rm -rf "$V"
 chmod +x "$MODPATH/tools/inotifywait"
 

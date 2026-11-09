@@ -100,6 +100,20 @@ _inject_susfs_init() {
 
 
 # KernelSU-Next
+_fix_susfs_log_rl_stubs() {
+  # susfs4ksu 41da83f added SUSFS_LOGI_RL/LOGE_RL but defined them only when
+  # CONFIG_KSU_SUSFS_ENABLE_LOG=y; the !ENABLE_LOG branch has no stubs.
+  local F="fs/susfs.c"
+  [ -f "$F" ] || return 0
+  grep -qE '^#define SUSFS_LOGI_RL\(fmt, \.\.\.\)[[:space:]]*$' "$F" && return 0
+  if [ "$(grep -cxF '#define SUSFS_LOGE(fmt, ...) ' "$F")" != 1 ]; then
+    echo "[FAIL] _fix_susfs_log_rl_stubs: expected exactly 1 empty SUSFS_LOGE stub in $F"
+    return 1
+  fi
+  sed -i '/^#define SUSFS_LOGE(fmt, \.\.\.) $/a #define SUSFS_LOGI_RL(fmt, ...) \n#define SUSFS_LOGE_RL(fmt, ...) ' "$F"
+  echo "[OK] susfs.c: added SUSFS_LOG*_RL stubs"
+}
+
 _pin_susfs_lvc() {
   # kernel-release-spoof sets VERSION=6 PATCHLEVEL=12, so susfs.c took 6.x branches.
   # Pin LINUX_VERSION_CODE after the last include, same pattern as nomount.h.
@@ -426,6 +440,7 @@ if [ "$KSU_TYPE" = "ksun" ]; then
   cp -f susfs4ksu/kernel_patches/include/linux/* include/linux/
   _patch_susfs_def_h
   _pin_susfs_lvc
+  _fix_susfs_log_rl_stubs || exit 1
   _pin_ksun_lvc
   _fix_susfs_fake_state
 

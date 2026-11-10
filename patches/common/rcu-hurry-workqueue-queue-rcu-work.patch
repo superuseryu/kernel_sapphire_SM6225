@@ -1,0 +1,13 @@
+diff --git a/kernel/workqueue.c b/kernel/workqueue.c
+index 627bdb9576a52..d7610077af136 100644
+--- a/kernel/workqueue.c
++++ b/kernel/workqueue.c
+@@ -1792,7 +1792,7 @@ bool queue_rcu_work(struct workqueue_struct *wq, struct rcu_work *rwork)
+ 
+ 	if (!test_and_set_bit(WORK_STRUCT_PENDING_BIT, work_data_bits(work))) {
+ 		rwork->wq = wq;
+-		call_rcu(&rwork->rcu, rcu_work_rcufn);
++		call_rcu_hurry(&rwork->rcu, rcu_work_rcufn);
+ 		return true;
+ 	}
+ 

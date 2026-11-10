@@ -65,10 +65,10 @@ else
 	set_status "😋 zram.ko (multi-comp+IR) loaded ahead of native swapon"
 fi
 
-# NAP cpuidle governor — switch after qcom_lpm loads at boot
+# TEO cpuidle governor — switch after qcom_lpm loads at boot
 # qcom_lpm wins at boot (rating 50 > NAP 18) but does not re-register
 # post-suspend, so a one-shot write here is permanent until next reboot.
-echo nap > /sys/devices/system/cpu/cpuidle/current_governor 2>/dev/null
+echo teo > /sys/devices/system/cpu/cpuidle/current_governor 2>/dev/null
 
 # ADIOS I/O scheduler — storage devices only (dm/loop/ram don't support schedulers)
 for dev in /sys/block/sd*/queue/scheduler; do

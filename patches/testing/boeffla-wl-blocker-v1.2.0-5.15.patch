@@ -280,7 +280,7 @@ index 0000000000000..71b182678ffad
 +module_exit(boeffla_wl_blocker_exit);
 diff --git a/drivers/base/power/boeffla_wl_blocker.h b/drivers/base/power/boeffla_wl_blocker.h
 new file mode 100644
-index 0000000000000..4ddaf79b90eec
+index 0000000000000..269d55a0ed2f9
 --- /dev/null
 +++ b/drivers/base/power/boeffla_wl_blocker.h
 @@ -0,0 +1,51 @@
@@ -323,10 +323,10 @@ index 0000000000000..4ddaf79b90eec
 +#define LIST_WL_DEFAULT \
 +	"RMNET_DFC;DIAG_WS;qcom_rx_wakelock;wlan;wlan_wow_wl;wlan_extscan_wl;" \
 +	"wlan_pno_wl;wlan_roam_wl;wlan_ipa;netmgr_wl;NETLINK;" \
-+	"a600000.ssusb;998000.qcom,qup_uart;hal_bluetooth_lock;" \
-+	"IPA_WS;IPA_CLIENT_APPS_WAN_COAL_CONS;IPA_CLIENT_APPS_WAN_LOW_LAT_CONS;" \
++	"4e00000.ssusb;4a8c000.qcom,qup_uart;hal_bluetooth_lock;" \
++	"IPA_WS;IPA_CLIENT_APPS_WAN_CONS;IPA_CLIENT_APPS_WAN_LOW_LAT_CONS;" \
 +	"IPA_CLIENT_APPS_LAN_CONS;rmnet_ipa%d;rmnet_ctl;RMNET_SHS;" \
-+	"Q6BIOS_WLAN;mtk_wmt_top;btsdio_wl;mgmt_txrx"
++	"Q6BIOS_WLAN;mtk_wmt_top;btsdio_wl;mgmt_txrx tx_cmp"
 +
 +#define LENGTH_LIST_WL				1024
 +/* Both lists are sysfs-writable, so both get the full capacity. Deriving this

@@ -1,5 +1,5 @@
 diff --git a/kernel/rcu/tree_nocb.h b/kernel/rcu/tree_nocb.h
-index cdeb55552..fc8c8a9c6 100644
+index cdeb55552ab9f..70d8af81acfc2 100644
 --- a/kernel/rcu/tree_nocb.h
 +++ b/kernel/rcu/tree_nocb.h
 @@ -250,8 +250,9 @@ static bool wake_nocb_gp(struct rcu_data *rdp, bool force)
@@ -7,7 +7,7 @@ index cdeb55552..fc8c8a9c6 100644
   * left unsubmitted to RCU after those many jiffies.
   */
 -#define LAZY_FLUSH_JIFFIES (10 * HZ)
-+#define LAZY_FLUSH_JIFFIES (30 * HZ)
++#define LAZY_FLUSH_JIFFIES (3 * HZ)
  static unsigned long jiffies_till_flush = LAZY_FLUSH_JIFFIES;
 +module_param(jiffies_till_flush, ulong, 0444);
  

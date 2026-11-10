@@ -1,10 +1,10 @@
 diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
-index c63de9ed3dc08..3ee0a134f20ef 100644
+index a8cf5474aae47..210be7eb80905 100644
 --- a/drivers/cpufreq/Kconfig
 +++ b/drivers/cpufreq/Kconfig
-@@ -211,6 +211,26 @@ config CPU_FREQ_GOV_SCHEDUTIL
+@@ -224,6 +224,26 @@ config CPU_FREQ_GOV_REFLEX
  
- 	  If in doubt, say N.
+ 	  If in doubt, say M.
  
 +config CPU_FREQ_DEFAULT_GOV_VORPAL
 +	bool "vorpal"
@@ -30,20 +30,20 @@ index c63de9ed3dc08..3ee0a134f20ef 100644
  
  config CPUFREQ_DT
 diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index f357aa757a098..87150cf078a22 100644
+index c63ab3736d761..0e0994cb66ab4 100644
 --- a/drivers/cpufreq/Makefile
 +++ b/drivers/cpufreq/Makefile
-@@ -113,3 +113,4 @@ obj-$(CONFIG_LOONGSON1_CPUFREQ)		+= loongson1-cpufreq.o
+@@ -114,3 +114,4 @@ obj-$(CONFIG_LOONGSON1_CPUFREQ)		+= loongson1-cpufreq.o
  obj-$(CONFIG_SH_CPU_FREQ)		+= sh-cpufreq.o
  obj-$(CONFIG_SPARC_US2E_CPUFREQ)	+= sparc-us2e-cpufreq.o
  obj-$(CONFIG_SPARC_US3_CPUFREQ)		+= sparc-us3-cpufreq.o
 +obj-$(CONFIG_CPU_FREQ_GOV_VORPAL)	+= cpufreq_vorpal.o
 diff --git a/drivers/cpufreq/cpufreq_vorpal.c b/drivers/cpufreq/cpufreq_vorpal.c
 new file mode 100644
-index 0000000000000..a8a7ac4c81f54
+index 0000000000000..420bd16d24bee
 --- /dev/null
 +++ b/drivers/cpufreq/cpufreq_vorpal.c
-@@ -0,0 +1,2427 @@
+@@ -0,0 +1,2434 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Vorpal CPUFreq Governor — schedutil-derived, dual-profile (gaming/daily).
@@ -86,8 +86,11 @@ index 0000000000000..a8a7ac4c81f54
 +#define CPUFREQ_VORPAL_VERSION  "2.3"
 +#define CPUFREQ_VORPAL_AUTHOR   "Steambot12"
 +
-+extern void rfx_get_util_gki515(int cpu, unsigned long boost,
-+				unsigned long *util, unsigned long *bwmin);
++extern unsigned long rfx_get_util_gki515(int cpu, unsigned long boost,
++					 unsigned long *bwmin);
++extern unsigned long rfx_get_uclamp_min_gki515(int cpu);
++extern unsigned long rfx_get_uclamp_max_gki515(int cpu);
++extern int rfx_setattr_sugov_gki515(struct task_struct *t);
 +extern bool rfx_dl_bw_exceeded_gki515(int cpu, unsigned long bwmin);
 +
 +#define RFX_LITTLE_CAP_THRESHOLD	614
@@ -1257,7 +1260,7 @@ index 0000000000000..a8a7ac4c81f54
 +
 +static void rfx_get_util(struct rfx_cpu *rfx_c, unsigned long boost)
 +{
-+	rfx_get_util_gki515(rfx_c->cpu, boost, &rfx_c->util, &rfx_c->bwmin);
++	rfx_c->util = rfx_get_util_gki515(rfx_c->cpu, boost, &rfx_c->bwmin);
 +}
 +
 +static inline void rfx_ignore_dl_rate_limit(struct rfx_cpu *rfx_c)
@@ -1485,8 +1488,12 @@ index 0000000000000..a8a7ac4c81f54
 +
 +		jb = rfx_iowait_apply(jc, time, max_cap);
 +		rfx_get_util(jc, jb);
-+		uc_min = 0; /* rfx_get_uclamp_min not exported by Reflex 5.15 */
-+		uc_max = 0; /* rfx_get_uclamp_max not exported by Reflex 5.15 */
++		uc_min = rfx_get_uclamp_min_gki515(j);
++		if (uc_min > max_uclamp_min)
++			max_uclamp_min = uc_min;
++		uc_max = rfx_get_uclamp_max_gki515(j);
++		if (uc_max > max_uclamp_max)
++			max_uclamp_max = uc_max;
 +		je = max(jc->util, jb);
 +		if (gaming) {
 +			if (uc_min > je)
@@ -1959,8 +1966,8 @@ index 0000000000000..a8a7ac4c81f54
 +		return PTR_ERR(thread);
 +	}
 +
-+	/* rfx_setattr_sugov not exported by Reflex 5.15; set SCHED_FIFO directly */
-+	{
++	ret = rfx_setattr_sugov_gki515(thread);
++	if (ret) {
 +		struct sched_param param = { .sched_priority = MAX_RT_PRIO / 2 };
 +
 +		ret = sched_setscheduler_nocheck(thread, SCHED_FIFO, &param);

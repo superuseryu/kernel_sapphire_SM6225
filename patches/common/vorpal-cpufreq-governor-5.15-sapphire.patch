@@ -2473,10 +2473,10 @@ index 0000000000000..be544eb382097
 +MODULE_DESCRIPTION("Vorpal CPUFreq Governor v2.3");
 diff --git a/include/trace/events/vorpal.h b/include/trace/events/vorpal.h
 new file mode 100644
-index 0000000000000..e01de1e7cc1dc
+index 0000000000000..634f2e68e8b04
 --- /dev/null
 +++ b/include/trace/events/vorpal.h
-@@ -0,0 +1,45 @@
+@@ -0,0 +1,55 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
 +#undef TRACE_SYSTEM
 +#define TRACE_SYSTEM vorpal
@@ -2489,13 +2489,16 @@ index 0000000000000..e01de1e7cc1dc
 +/*
 + * One event per committed frequency change. demand/fceil are percentages of
 + * capacity / the effective ceiling as the governor saw them at the decision;
-+ * gaming is the gaming_mode level (0 daily, 1/2 gaming tiers).
++ * gaming is the gaming_mode level (0 daily, 1/2 gaming tiers); pr is the
++ * raw thermal pressure in capacity units (0 = no data); warm is the
++ * warmup-window latch as seen by this eval (prime path only, else 0).
 + */
 +TRACE_EVENT(vorpal,
 +	TP_PROTO(unsigned int cpu, int gaming, unsigned int freq,
-+		 unsigned int demand_pct, unsigned int fceil_pct),
++		 unsigned int demand_pct, unsigned int fceil_pct,
++		 unsigned int pr_pct, int warm, int prime),
 +
-+	TP_ARGS(cpu, gaming, freq, demand_pct, fceil_pct),
++	TP_ARGS(cpu, gaming, freq, demand_pct, fceil_pct, pr_pct, warm, prime),
 +
 +	TP_STRUCT__entry(
 +		__field(unsigned int, cpu)
@@ -2503,6 +2506,9 @@ index 0000000000000..e01de1e7cc1dc
 +		__field(unsigned int, freq)
 +		__field(unsigned int, demand_pct)
 +		__field(unsigned int, fceil_pct)
++		__field(unsigned int, pr_pct)
++		__field(int, warm)
++		__field(int, prime)
 +	),
 +
 +	TP_fast_assign(
@@ -2511,11 +2517,15 @@ index 0000000000000..e01de1e7cc1dc
 +		__entry->freq = freq;
 +		__entry->demand_pct = demand_pct;
 +		__entry->fceil_pct = fceil_pct;
++		__entry->pr_pct = pr_pct;
++		__entry->warm = warm;
++		__entry->prime = prime;
 +	),
 +
-+	TP_printk("cpu=%u gaming=%d freq=%u demand=%u fceil=%u",
++	TP_printk("cpu=%u gaming=%d freq=%u demand=%u fceil=%u pr=%u warm=%d prime=%d",
 +		  __entry->cpu, __entry->gaming, __entry->freq,
-+		  __entry->demand_pct, __entry->fceil_pct)
++		  __entry->demand_pct, __entry->fceil_pct, __entry->pr_pct,
++		  __entry->warm, __entry->prime)
 +);
 +
 +#endif /* _TRACE_VORPAL_H */

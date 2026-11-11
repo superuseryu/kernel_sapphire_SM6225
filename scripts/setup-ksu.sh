@@ -312,8 +312,8 @@ def sub(t, old, new, label):
     return t.replace(old, new)
 
 t = sub(t,
-    '#include "feature/kernel_umount.h"\n',
-    '#include "feature/kernel_umount.h"\n#include "hook/setuid_hook.h"\n#include "feature/sucompat.h"\n',
+    '#include "feature/module_blacklist.h"\n',
+    '#include "feature/module_blacklist.h"\n#include "hook/setuid_hook.h"\n#include "feature/sucompat.h"\n',
     "add setuid_hook/sucompat includes")
 
 t = sub(t,
@@ -418,6 +418,9 @@ print("[OK] init.c adapted")
 INNER
 
     # --- setuid_hook.c ---
+    # Apply rej first (while tp_marker.h context still exists), then strip tp_marker.h
+    patch -p0 --forward --no-backup-if-mismatch < kernel/hook/setuid_hook.c.rej \
+      || { echo "[FAIL] setuid_hook.c.rej did not apply"; exit 1; }
     python3 - <<'INNER'
 p = "kernel/hook/setuid_hook.c"
 t = open(p).read()
@@ -427,8 +430,6 @@ assert n == 1, f"[FAIL] tp_marker anchor matched {n}x"
 open(p, "w").write(t.replace(old, ""))
 print("[OK] setuid_hook.c adapted")
 INNER
-    patch -p0 --forward --no-backup-if-mismatch < kernel/hook/setuid_hook.c.rej \
-      || { echo "[FAIL] setuid_hook.c.rej did not apply"; exit 1; }
 
     # --- allowlist.c ---
     python3 - <<'INNER'

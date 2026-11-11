@@ -448,19 +448,146 @@ print("[OK] init.c adapted")
 INNER
 
     # --- setuid_hook.c ---
-    # Strip tp_marker.h first, then apply rej with -p1 from SukiSU-Ultra root
     python3 - <<'INNER'
+import sys
 p = "kernel/hook/setuid_hook.c"
 t = open(p).read()
-old = '#include "hook/tp_marker.h"\n'
-n = t.count(old)
-assert n == 1, f"[FAIL] tp_marker anchor matched {n}x"
-open(p, "w").write(t.replace(old, ""))
-print("[OK] setuid_hook.c tp_marker stripped")
+
+def sub(t, old, new, label):
+    n = t.count(old)
+    assert n == 1, f"[FAIL] {label}: {n}x"
+    return t.replace(old, new)
+
+t = sub(t, '#include "hook/tp_marker.h"\n', '', "tp_marker strip")
+
+old_body = (
+    '#include "feature/mount_hide.h"\n'
+    '\n'
+    'int ksu_handle_setresuid(uid_t old_uid, uid_t new_uid)\n'
+    '{\n'
+    '    // we rely on the fact that zygote always call setresuid(3) with same uids\n'
+    '\n'
+    '    if (unlikely(is_uid_manager(new_uid))) {\n'
+    '        spin_lock_irq(&current->sighand->siglock);\n'
+    '        ksu_seccomp_allow_cache(current->seccomp.filter, __NR_reboot);\n'
+    '        ksu_set_task_tracepoint_flag(current);\n'
+    '        spin_unlock_irq(&current->sighand->siglock);\n'
+    '\n'
+    '        ksu_install_fd();\n'
+    '        return 0;\n'
+    '    }\n'
+    '\n'
+    '    if (ksu_is_allow_uid_for_current(new_uid)) {\n'
+    '        if (current->seccomp.mode == SECCOMP_MODE_FILTER && current->seccomp.filter) {\n'
+    '            spin_lock_irq(&current->sighand->siglock);\n'
+    '            ksu_seccomp_allow_cache(current->seccomp.filter, __NR_reboot);\n'
+    '            spin_unlock_irq(&current->sighand->siglock);\n'
+    '        }\n'
+    '        ksu_set_task_tracepoint_flag(current);\n'
+    '    } else {\n'
+    '        ksu_clear_task_tracepoint_flag_if_needed(current);\n'
+    '    }\n'
+    '\n'
+    '    // Handle kernel umount\n'
+    '    ksu_handle_umount(old_uid, new_uid);\n'
+    '\n'
+    '    return 0;\n'
+    '}\n'
+)
+new_body = (
+    '#include "feature/mount_hide.h"\n'
+    '\n'
+    'extern u32 susfs_zygote_sid;\n'
+    'extern u32 susfs_zygote_next_sid;\n'
+    'extern void disable_seccomp(void);\n'
+    'extern struct work_struct susfs_extra_works;\n'
+    '\n'
+    'static inline void ksu_handle_extra_susfs_work(void)\n'
+    '{\n'
+    '    if (work_pending(&susfs_extra_works))\n'
+    '        return;\n'
+    '    schedule_work(&susfs_extra_works);\n'
+    '}\n'
+    '\n'
+    'static int handle_zygote_setresuid(uid_t ruid) {\n'
+    '    if (is_isolated_process(ruid)) {\n'
+    '        susfs_set_current_proc_no_su();\n'
+    '        susfs_set_current_proc_umounted();\n'
+    '        goto do_umount;\n'
+    '    }\n'
+    '    if (likely(ksu_is_manager_appid_valid()) && unlikely(is_uid_manager(ruid))) {\n'
+    '        disable_seccomp();\n'
+    '        pr_info("install fd for manager: %d\\n", ruid);\n'
+    '        ksu_install_fd();\n'
+    '        return 0;\n'
+    '    }\n'
+    '    if (likely(is_appuid(ruid) && ksu_uid_should_umount(ruid))) {\n'
+    '        susfs_set_current_proc_no_su();\n'
+    '        susfs_set_current_proc_umounted();\n'
+    '        goto do_umount;\n'
+    '    }\n'
+    '    if (ksu_is_allow_uid_for_current(ruid)) {\n'
+    '        disable_seccomp();\n'
+    '        return 0;\n'
+    '    }\n'
+    '    susfs_set_current_proc_no_su();\n'
+    '    return 0;\n'
+    'do_umount:\n'
+    '    {\n'
+    '        ksu_handle_umount(current_uid().val, ruid);\n'
+    '        ksu_handle_extra_susfs_work();\n'
+    '    }\n'
+    '    return 0;\n'
+    '}\n'
+    '\n'
+    'static int handle_zygote_next_setresuid(uid_t ruid) {\n'
+    '    if (is_isolated_process(ruid)) {\n'
+    '        susfs_set_current_proc_no_su();\n'
+    '        susfs_set_current_proc_umounted();\n'
+    '        susfs_set_current_proc_umounted_for_zygote_next();\n'
+    '        goto do_susfs_work;\n'
+    '    }\n'
+    '    if (likely(ksu_is_manager_appid_valid()) && unlikely(is_uid_manager(ruid))) {\n'
+    '        disable_seccomp();\n'
+    '        pr_info("install fd for manager: %d\\n", ruid);\n'
+    '        ksu_install_fd();\n'
+    '        return 0;\n'
+    '    }\n'
+    '    if (likely(is_appuid(ruid) && ksu_uid_should_umount(ruid))) {\n'
+    '        susfs_set_current_proc_no_su();\n'
+    '        susfs_set_current_proc_umounted();\n'
+    '        susfs_set_current_proc_umounted_for_zygote_next();\n'
+    '        goto do_susfs_work;\n'
+    '    }\n'
+    '    if (ksu_is_allow_uid_for_current(ruid)) {\n'
+    '        disable_seccomp();\n'
+    '        return 0;\n'
+    '    }\n'
+    '    susfs_set_current_proc_no_su();\n'
+    '    return 0;\n'
+    'do_susfs_work:\n'
+    '    {\n'
+    '        ksu_handle_extra_susfs_work();\n'
+    '    }\n'
+    '    return 0;\n'
+    '}\n'
+    '\n'
+    'int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)\n'
+    '{\n'
+    '    uid_t cur_uid = current_uid().val;\n'
+    '    if (cur_uid != 0)\n'
+    '        return 0;\n'
+    '    if (susfs_is_sid_equal(current_cred(), susfs_zygote_sid))\n'
+    '        return handle_zygote_setresuid(ruid);\n'
+    '    if (susfs_is_sid_equal(current_cred(), susfs_zygote_next_sid))\n'
+    '        return handle_zygote_next_setresuid(ruid);\n'
+    '    return 0;\n'
+    '}\n'
+)
+t = sub(t, old_body, new_body, "setuid_hook body")
+open(p, "w").write(t)
+print("[OK] setuid_hook.c adapted")
 INNER
-    patch -p1 --forward --no-backup-if-mismatch < "../$P" 2>/dev/null || true
-    [ ! -f kernel/hook/setuid_hook.c.rej ] \
-      || { echo "[FAIL] setuid_hook.c.rej still present after re-apply"; exit 1; }
 
     # --- allowlist.c ---
     python3 - <<'INNER'

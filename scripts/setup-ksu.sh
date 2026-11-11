@@ -875,6 +875,25 @@ elif [ "$KSU_TYPE" = "sksu" ]; then
   _pin_susfs_lvc
 
   _apply_sksu_susfs_ksu || exit 1
+
+  # patch_memory.o missing from Kbuild on main branch — add arch-guarded entry
+  python3 - <<'INNER'
+p = "SukiSU-Ultra/kernel/Kbuild"
+t = open(p).read()
+if "hook/arm64/patch_memory.o" in t:
+    print("[OK] patch_memory.o already in Kbuild")
+else:
+    old = "kernelsu-objs += hook/setuid_hook.o\n"
+    new = ("kernelsu-objs += hook/setuid_hook.o\n"
+           "ifeq ($(SRCARCH),arm64)\n"
+           "kernelsu-objs += hook/arm64/patch_memory.o\n"
+           "endif\n")
+    n = t.count(old)
+    assert n == 1, f"[FAIL] setuid_hook anchor: {n}x"
+    open(p, "w").write(t.replace(old, new))
+    print("[OK] hook/arm64/patch_memory.o added to Kbuild")
+INNER
+
   _pin_sksu_lvc
   _link_ksu_driver "SukiSU-Ultra/kernel"
   rm -rf susfs4ksu

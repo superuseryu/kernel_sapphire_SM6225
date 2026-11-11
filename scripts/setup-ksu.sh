@@ -285,7 +285,8 @@ _apply_sksu_susfs_ksu() {
   # v4.3.0-r2 ships without SUSFS. Apply simonpunk's KernelSU enable-patch,
   # then hand-adapt the 5 files that reject:
   #   init.c (4 hunks), setuid_hook.c (1), allowlist.c (1),
-  #   ksud_integration.c (1), rules.c (1)
+  #   ksud_integration.c (1)
+  #   rules.c applies clean on main branch
   # dispatch.c now applies clean — no hand-adapt needed.
   local D="SukiSU-Ultra"
   local P="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
@@ -295,7 +296,7 @@ _apply_sksu_susfs_ksu() {
     cd "$D" || exit 1
     patch -p1 --forward --no-backup-if-mismatch < "../$P" > /tmp/sksu_susfs_patch.log 2>&1 || true
     rejs=$(find . -name '*.rej' | sort | tr '\n' ' ')
-    expected="./kernel/core/init.c.rej ./kernel/hook/setuid_hook.c.rej ./kernel/policy/allowlist.c.rej ./kernel/runtime/ksud_integration.c.rej ./kernel/selinux/rules.c.rej "
+    expected="./kernel/core/init.c.rej ./kernel/hook/setuid_hook.c.rej ./kernel/policy/allowlist.c.rej ./kernel/runtime/ksud_integration.c.rej "
     if [ "$rejs" != "$expected" ]; then
       echo "[FAIL] unexpected reject set: '$rejs'"
       grep -E 'FAILED|^checking file|^patching file' /tmp/sksu_susfs_patch.log

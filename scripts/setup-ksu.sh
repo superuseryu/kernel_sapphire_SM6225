@@ -766,7 +766,6 @@ _pin_sksu_lvc() {
   _pin_lvc_after "SukiSU-Ultra/kernel/manager/apk_sign.c" '#include <crypto/hash.h>' || return 1
   _pin_lvc_after "SukiSU-Ultra/kernel/manager/pkg_observer.c" '#include "manager/throne_tracker.h"' || return 1
   _pin_lvc_after "SukiSU-Ultra/kernel/selinux/sepolicy.c" '#include "ss/symtab.h"' || return 1
-  _pin_lvc_after "SukiSU-Ultra/kernel/kpm/super_access.c" '#include "compact.h"' || return 1
 }
 
 _pin_ksun_lvc() {

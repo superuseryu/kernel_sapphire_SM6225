@@ -317,11 +317,16 @@ t = sub(t,
     '#include "selinux/selinux.h"\n#include "feature/adb_root.h"\n#include "hook/setuid_hook.h"\n#include "feature/sucompat.h"\n',
     "hunk3: includes")
 
-# hunk5: remove ksu_bundled
+# hunk5: remove ksu_bundled and ksu_late_loaded assignment blocks
 t = sub(t,
     '\n#ifdef MODULE\nbool ksu_bundled = false;\nmodule_param_named(bundled, ksu_bundled, bool, 0);\n#endif\n\n',
     '\n',
     "hunk5: ksu_bundled")
+
+t = sub(t,
+    '\n#ifdef MODULE\n    ksu_late_loaded = (current->pid != 1);\n#else\n    ksu_late_loaded = false;\n#endif\n\n',
+    '\n',
+    "hunk5: ksu_late_loaded")
 
 # hunk7a: remove syscall_hook_init, inject susfs_init
 t = sub(t,

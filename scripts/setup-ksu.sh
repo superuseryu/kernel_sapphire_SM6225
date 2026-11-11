@@ -448,6 +448,12 @@ t = sub(t,
     "    ksu_preinit_exit();\n",
     "hunk8: flatten exit")
 
+# hunk8b: remove ksu_lsm_hook_exit (lsm_hook removed from init, exit must match)
+t = sub(t,
+    "    ksu_lsm_hook_exit();\n",
+    "",
+    "hunk8b: ksu_lsm_hook_exit")
+
 open(p, "w").write(t)
 print("[OK] init.c adapted")
 INNER

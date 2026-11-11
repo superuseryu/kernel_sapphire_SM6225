@@ -452,7 +452,7 @@ if [ "$KSU_TYPE" = "ksun" ]; then
 elif [ "$KSU_TYPE" = "sksu" ]; then
   rm -rf ./KernelSU ./drivers/kernelsu ./SukiSU-Ultra
 
-  git clone --depth=1 --branch v4.2.1 \
+  git clone --depth=1 --branch "${SKSU_TAG_PIN:-v4.3.0-r2}" \
     https://github.com/SukiSU-Ultra/SukiSU-Ultra.git
   [ -d "SukiSU-Ultra" ] || { echo "[ERROR] SukiSU-Ultra not found"; exit 1; }
 
@@ -471,7 +471,7 @@ elif [ "$KSU_TYPE" = "sksu" ]; then
   echo "${_sksu_ver:-}" > "$WORK_DIR/sksu_version.txt"
   cd ..
 
-  # HEAD patches expect KSU preinit, SukiSU v4.2.1 has none: pinned
+  # HEAD patches expect KSU preinit, pinned to SKSU_TAG_PIN or v4.3.0-r2
   git clone -b gki-android13-5.15 https://gitlab.com/simonpunk/susfs4ksu.git
   git -C susfs4ksu checkout -q 2ad2973 || { echo "[ERROR] susfs4ksu pin 2ad2973 not found"; exit 1; }
   SUSFS_COMMIT=$(git -C susfs4ksu rev-parse --short HEAD 2>/dev/null || echo "unknown")

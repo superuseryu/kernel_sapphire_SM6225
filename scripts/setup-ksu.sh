@@ -838,7 +838,7 @@ if [ "$KSU_TYPE" = "ksun" ]; then
 elif [ "$KSU_TYPE" = "sksu" ]; then
   rm -rf ./KernelSU ./drivers/kernelsu ./SukiSU-Ultra
 
-  git clone --depth=1 --branch "${SKSU_TAG_PIN:-v4.3.0-r2}" \
+  git clone --depth=1 --branch "${SKSU_TAG_PIN:-main}" \
     https://github.com/SukiSU-Ultra/SukiSU-Ultra.git
   [ -d "SukiSU-Ultra" ] || { echo "[ERROR] SukiSU-Ultra not found"; exit 1; }
 

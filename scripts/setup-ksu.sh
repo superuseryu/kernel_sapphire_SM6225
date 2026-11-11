@@ -282,9 +282,11 @@ _pin_lvc_before() {
 }
 
 _apply_sksu_susfs_ksu() {
-  # v4.2.1 ships without SUSFS. Apply simonpunk's KernelSU enable-patch, then
-  # hand-adapt the only 4 hunks that reject (init.c x3, ksud_integration.c x1).
-  # Every anchor must match exactly once; any other reject set aborts the build.
+  # v4.3.0-r2 ships without SUSFS. Apply simonpunk's KernelSU enable-patch,
+  # then hand-adapt the 5 files that reject:
+  #   init.c (4 hunks), setuid_hook.c (1), allowlist.c (1),
+  #   ksud_integration.c (1), rules.c (1)
+  # dispatch.c now applies clean — no hand-adapt needed.
   local D="SukiSU-Ultra"
   local P="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
   [ -f "$P" ] || { echo "[FAIL] _apply_sksu_susfs_ksu: $P not found"; return 1; }
@@ -293,75 +295,290 @@ _apply_sksu_susfs_ksu() {
     cd "$D" || exit 1
     patch -p1 --forward --no-backup-if-mismatch < "../$P" > /tmp/sksu_susfs_patch.log 2>&1 || true
     rejs=$(find . -name '*.rej' | sort | tr '\n' ' ')
-    if [ "$rejs" != "./kernel/core/init.c.rej ./kernel/runtime/ksud_integration.c.rej " ]; then
+    expected="./kernel/core/init.c.rej ./kernel/hook/setuid_hook.c.rej ./kernel/policy/allowlist.c.rej ./kernel/runtime/ksud_integration.c.rej ./kernel/selinux/rules.c.rej "
+    if [ "$rejs" != "$expected" ]; then
       echo "[FAIL] unexpected reject set: '$rejs'"
       grep -E 'FAILED|^checking file|^patching file' /tmp/sksu_susfs_patch.log
       exit 1
     fi
 
-    python3 - <<'PYEOF' || exit 1
+    # --- init.c ---
+    python3 - <<'INNER'
 p = "kernel/core/init.c"
 t = open(p).read()
-def sub(t, old, new):
+def sub(t, old, new, label):
     n = t.count(old)
-    assert n == 1, f"anchor matched {n}x: {old[:60]!r}"
+    assert n == 1, f"[FAIL] init.c anchor matched {n}x: {label}"
     return t.replace(old, new)
 
-t = sub(t, '#include "runtime/ksud_boot.h"\n',
-        '#include "runtime/ksud_boot.h"\n#include "hook/setuid_hook.h"\n#include "feature/sucompat.h"\n')
-t = sub(t, '#ifdef MODULE\n    ksu_late_loaded = (current->pid != 1);\n#else\n    ksu_late_loaded = false;\n#endif\n\n', '')
-t = sub(t, '    ksu_syscall_hook_init();\n\n    ksu_feature_init();\n',
-        '#ifdef CONFIG_KSU_SUSFS\n    susfs_init();\n#endif\n\n    ksu_feature_init();\n')
-t = sub(t, '    ksu_lsm_hook_init();\n', '')
-t = sub(t, '    ksu_supercalls_init();\n    ksu_app_profile_init();\n', '    ksu_supercalls_init();\n')
+t = sub(t,
+    '#include "feature/kernel_umount.h"\n',
+    '#include "feature/kernel_umount.h"\n#include "hook/setuid_hook.h"\n#include "feature/sucompat.h"\n',
+    "add setuid_hook/sucompat includes")
 
-sm = '    if (ksu_late_loaded) {\n        pr_info("late load'
-em = '        ksu_file_wrapper_init();\n    }\n'
-assert t.count(sm) == 1 and t.count(em) == 1
-s = t.index(sm); e = t.index(em, s) + len(em)
-new = ('    ksu_sucompat_init();\n    ksu_setuid_hook_init();\n\n'
-       '    ksu_allowlist_init();\n\n    ksu_throne_tracker_init();\n\n'
-       '    ksu_ksud_init();\n\n    ksu_file_wrapper_init();\n')
-t = t[:s] + new + t[e:]
+t = sub(t,
+    '    ksu_syscall_hook_init();\n\n    // Block modules early, before vendor modules are loaded in second stage.\n    ksu_module_blacklist_init();\n',
+    '#ifdef CONFIG_KSU_SUSFS\n    susfs_init();\n#endif // #ifdef KSU_SUSFS\n\n    ksu_module_blacklist_init();\n',
+    "inject susfs_init + remove syscall_hook_init")
 
-t = sub(t, '    // Phase 1: Stop all hooks first to prevent new callbacks\n    ksu_syscall_hook_manager_exit();\n\n    ksu_supercalls_exit();\n\n    if (!ksu_late_loaded)\n        ksu_ksud_exit();\n',
-        '    ksu_supercalls_exit();\n\n    ksu_ksud_exit();\n')
+old7 = ('    ksu_supercalls_init();\n'
+        '    ksu_app_profile_init();\n'
+        '    ksu_extension_init();\n'
+        '    ksu_extension_register_all();\n'
+        '\n'
+        '    if (ksu_late_loaded) {\n'
+        '        pr_info("late load mode, skipping kprobe hooks\\n");\n'
+        '\n'
+        '        apply_kernelsu_rules();\n'
+        '        cache_sid();\n'
+        '        setup_ksu_cred();\n'
+        '        // Grant current process (ksud late-load) root\n'
+        '        // with KSU SELinux domain before enforcing SELinux, so it\n'
+        '        // can continue to access /data/app etc. after enforcement.\n'
+        '        escape_to_root_for_init();\n'
+        '\n'
+        '        ksu_allowlist_init();\n'
+        '        ksu_load_allow_list();\n'
+        '        ksu_dynamic_manager_load();\n'
+        '\n'
+        '        ksu_syscall_hook_manager_init();\n'
+        '\n'
+        '        ksu_throne_tracker_init();\n'
+        '        ksu_observer_init();\n'
+        '        ksu_file_wrapper_init();\n'
+        '\n'
+        '        ksu_boot_completed = true;\n'
+        '        track_throne(false);\n'
+        '\n'
+        '        ksu_avc_spoof_late_init();\n'
+        '        ksu_feature_apply_forced();\n'
+        '        ksu_extension_apply_forced();\n'
+        '\n'
+        '        if (!getenforce()) {\n'
+        '            pr_info("Permissive SELinux, enforcing\\n");\n'
+        '            setenforce(true);\n'
+        '        }\n'
+        '\n'
+        '    } else {\n'
+        '        ksu_syscall_hook_manager_init();\n'
+        '\n'
+        '        ksu_allowlist_init();\n'
+        '\n'
+        '        ksu_throne_tracker_init();\n'
+        '\n'
+        '        ksu_ksud_init();\n'
+        '\n'
+        '        ksu_preinit_init();\n'
+        '\n'
+        '        ksu_file_wrapper_init();\n'
+        '    }\n')
+new7 = ('    ksu_supercalls_init();\n'
+        '\n'
+        '    ksu_sucompat_init();\n'
+        '\n'
+        '    ksu_setuid_hook_init();\n'
+        '\n'
+        '    ksu_sulog_init();\n'
+        '\n'
+        '    ksu_adb_root_init();\n'
+        '\n'
+        '    ksu_selinux_hide_init();\n'
+        '\n'
+        '    ksu_shell_su_adb_only_init();\n'
+        '\n'
+        '    ksu_allowlist_init();\n'
+        '\n'
+        '    ksu_throne_tracker_init();\n'
+        '\n'
+        '    ksu_ksud_init();\n'
+        '\n'
+        '    ksu_preinit_init();\n'
+        '\n'
+        '    ksu_file_wrapper_init();\n')
+t = sub(t, old7, new7, "flatten late_loaded branch")
+
+old8 = ('    // Phase 1: Stop all hooks first to prevent new callbacks\n'
+        '    ksu_syscall_hook_manager_exit();\n'
+        '\n'
+        '    ksu_supercalls_exit();\n'
+        '\n'
+        '    if (!ksu_late_loaded) {\n'
+        '        ksu_ksud_exit();\n'
+        '        ksu_preinit_exit();\n'
+        '    }\n')
+new8 = ('    ksu_supercalls_exit();\n'
+        '\n'
+        '    ksu_ksud_exit();\n'
+        '\n'
+        '    ksu_preinit_exit();\n')
+t = sub(t, old8, new8, "cleanup exit")
+
 open(p, "w").write(t)
 print("[OK] init.c adapted")
-PYEOF
+INNER
 
-    python3 - <<'PYEOF' || exit 1
-p = "kernel/runtime/ksud_integration.c"
+    # --- setuid_hook.c ---
+    python3 - <<'INNER'
+p = "kernel/hook/setuid_hook.c"
 t = open(p).read()
-old = ('            // Not earlier: a blocked module failing to load in first stage\n'
-       '            // init is fatal, ksuinit uses modules.blocklist for that instead.\n'
-       '            ksu_module_blacklist_apply();\n')
-assert t.count(old) == 1, t.count(old)
+old = '#include "hook/tp_marker.h"\n'
+n = t.count(old)
+assert n == 1, f"[FAIL] tp_marker anchor matched {n}x"
 open(p, "w").write(t.replace(old, ""))
-PYEOF
-    patch -p0 --forward --no-backup-if-mismatch < kernel/runtime/ksud_integration.c.rej \
-      || { echo "[FAIL] ksud_integration.c.rej did not apply"; exit 1; }
-    python3 - <<'PYEOF' || exit 1
+print("[OK] setuid_hook.c adapted")
+INNER
+    patch -p0 --forward --no-backup-if-mismatch < kernel/hook/setuid_hook.c.rej \
+      || { echo "[FAIL] setuid_hook.c.rej did not apply"; exit 1; }
+
+    # --- allowlist.c ---
+    python3 - <<'INNER'
+p = "kernel/policy/allowlist.c"
+t = open(p).read()
+old = ('    if (likely(ksu_is_manager_appid_valid()) && unlikely(ksu_get_manager_appid() == uid % PER_USER_RANGE)) {\n'
+       '        // we should not umount on manager!\n'
+       '        return false;\n'
+       '    }\n')
+n = t.count(old)
+assert n == 1, f"[FAIL] allowlist.c anchor matched {n}x"
+open(p, "w").write(t.replace(old, ""))
+print("[OK] allowlist.c adapted")
+INNER
+
+    # --- ksud_integration.c ---
+    python3 - <<'INNER'
 p = "kernel/runtime/ksud_integration.c"
 t = open(p).read()
-old = ('                ksu_feature_apply_forced();\n'
-       '                static_branch_disable(&is_init_second_stage_not_executed);\n')
-new = ('                ksu_feature_apply_forced();\n'
-       '                // Not earlier: a blocked module failing to load in first stage\n'
-       '                // init is fatal, ksuinit uses modules.blocklist for that instead.\n'
-       '                ksu_module_blacklist_apply();\n'
-       '                static_branch_disable(&is_init_second_stage_not_executed);\n')
-assert t.count(old) == 1, t.count(old)
+old = ('void ksu_handle_execveat_ksud(const char *path, struct user_arg_ptr *argv)\n'
+       '{\n'
+       '    static const char app_process[] = "/system/bin/app_process";\n'
+       '    static bool first_zygote = true;\n'
+       '\n'
+       '    /* This applies to versions Android 10+ */\n'
+       '    static const char system_bin_init[] = "/system/bin/init";\n'
+       '    static bool init_second_stage_executed = false;\n'
+       '\n'
+       '    // https://cs.android.com/android/platform/superproject/+/android-16.0.0_r2:system/core/init/main.cpp;l=77\n'
+       '    if (unlikely(!memcmp(path, system_bin_init, sizeof(system_bin_init) - 1) && argv)) {\n'
+       '        char buf[16];\n'
+       '        if (!init_second_stage_executed && check_argv(*argv, 1, "second_stage", buf, sizeof(buf))) {\n'
+       '            pr_info("/system/bin/init second_stage executed\\n");\n'
+       '            ksu_preinit_release();\n'
+       '            ksu_selinux_hide_handle_second_stage();\n'
+       '            apply_kernelsu_rules();\n'
+       '            cache_sid();\n'
+       '            setup_ksu_cred();\n'
+       '            // after apply_kernelsu_rules, so that selinux_hide has its sepolicy backup\n'
+       '            ksu_feature_apply_forced();\n'
+       '            // Not earlier: a blocked module failing to load in first stage\n'
+       '            // init is fatal, ksuinit uses modules.blocklist for that instead.\n'
+       '            ksu_module_blacklist_apply();\n'
+       '            init_second_stage_executed = true;\n'
+       '        }\n'
+       '    }\n'
+       '\n'
+       '    if (unlikely(first_zygote && !memcmp(path, app_process, sizeof(app_process) - 1) && argv)) {\n'
+       '        char buf[16];\n'
+       '        if (check_argv(*argv, 1, "-Xzygote", buf, sizeof(buf))) {\n'
+       '            pr_info("exec zygote, /data prepared, second_stage: %d\\n", init_second_stage_executed);\n'
+       '            ksu_preinit_release();\n'
+       '            on_post_fs_data();\n'
+       '            first_zygote = false;\n'
+       '            ksu_stop_ksud_execve_hook();\n'
+       '        }\n'
+       '    }\n'
+       '}\n')
+new = ('extern int ksu_handle_execveat_init(struct filename *filename, struct user_arg_ptr *argv_user, struct user_arg_ptr *envp_user);\n'
+       '\n'
+       '// IMPORTANT NOTE: the call from execve_handler_pre WON\'T provided correct value for envp and flags in GKI version\n'
+       'int ksu_handle_execveat_ksud(int *fd, struct filename **filename_ptr,\n'
+       '                             struct user_arg_ptr *argv,\n'
+       '                             struct user_arg_ptr *envp, int *flags)\n'
+       '{\n'
+       '    struct filename *filename;\n'
+       '    static const char app_process[] = "/system/bin/app_process";\n'
+       '\n'
+       '    /* This applies to versions Android 10+ */\n'
+       '    static const char system_bin_init[] = "/system/bin/init";\n'
+       '\n'
+       '    if (!filename_ptr)\n'
+       '        return 0;\n'
+       '\n'
+       '    filename = *filename_ptr;\n'
+       '    if (IS_ERR(filename)) {\n'
+       '        return 0;\n'
+       '    }\n'
+       '\n'
+       '    if (static_branch_unlikely(&is_init_second_stage_not_executed)) {\n'
+       '        // https://cs.android.com/android/platform/superproject/+/android-16.0.0_r2:system/core/init/main.cpp;l=77\n'
+       '        if (unlikely(!memcmp(filename->name, system_bin_init, sizeof(system_bin_init) - 1) && argv)) {\n'
+       '            char buf[16];\n'
+       '            if (check_argv(*argv, 1, "second_stage", buf, sizeof(buf))) {\n'
+       '                pr_info("/system/bin/init second_stage executed\\n");\n'
+       '                ksu_preinit_release();\n'
+       '                ksu_selinux_hide_handle_second_stage();\n'
+       '                apply_kernelsu_rules();\n'
+       '                cache_sid();\n'
+       '                setup_ksu_cred();\n'
+       '                // after apply_kernelsu_rules, so that selinux_hide has its sepolicy backup\n'
+       '                ksu_feature_apply_forced();\n'
+       '                static_branch_disable(&is_init_second_stage_not_executed);\n'
+       '            }\n'
+       '        }\n'
+       '    }\n'
+       '\n'
+       '    if (static_branch_unlikely(&is_first_zygote)) {\n'
+       '        if (unlikely(!memcmp(filename->name, app_process, sizeof(app_process) - 1) && argv)) {\n'
+       '            char buf[16];\n'
+       '            if (check_argv(*argv, 1, "-Xzygote", buf, sizeof(buf))) {\n'
+       '                pr_info("exec zygote, /data prepared, second_stage: %d\\n", !static_key_enabled(&is_init_second_stage_not_executed));\n'
+       '                ksu_preinit_release();\n'
+       '                on_post_fs_data();\n'
+       '                static_branch_disable(&is_first_zygote);\n'
+       '            }\n'
+       '        }\n'
+       '    }\n'
+       '\n'
+       '    return 0;\n'
+       '}\n')
+n = t.count(old)
+assert n == 1, f"[FAIL] ksud_integration.c anchor matched {n}x"
 open(p, "w").write(t.replace(old, new))
 print("[OK] ksud_integration.c adapted")
-PYEOF
-    rm -f kernel/core/init.c.rej kernel/runtime/ksud_integration.c.rej
+INNER
 
-    if grep -nE 'ksu_late_loaded|ksu_syscall_hook|ksu_lsm_hook' kernel/core/init.c kernel/runtime/ksud_integration.c; then
-      echo "[FAIL] legacy symbols remain"; exit 1
+    # --- rules.c ---
+    python3 - <<'INNER'
+p = "kernel/selinux/rules.c"
+t = open(p).read()
+old = ('    pol->latest_granting = old_pol->latest_granting + 1;\n'
+       '    rcu_assign_pointer(selinux_state.policy, pol);\n'
+       '    synchronize_rcu();\n'
+       '    ksu_destroy_sepolicy(old_pol);\n'
+       '\n'
+       '    reset_avc_cache(pol->latest_granting);\n')
+new = ('    rcu_assign_pointer(selinux_state.policy, pol);\n'
+       '    synchronize_rcu();\n'
+       '    ksu_destroy_sepolicy(old_pol);\n'
+       '\n'
+       '    reset_avc_cache();\n')
+n = t.count(old)
+assert n == 1, f"[FAIL] rules.c anchor matched {n}x"
+open(p, "w").write(t.replace(old, new))
+print("[OK] rules.c adapted")
+INNER
+
+    rm -f kernel/core/init.c.rej kernel/hook/setuid_hook.c.rej \
+          kernel/policy/allowlist.c.rej kernel/runtime/ksud_integration.c.rej \
+          kernel/selinux/rules.c.rej
+
+    if grep -nE 'ksu_syscall_hook_init|ksu_lsm_hook_init|ksu_late_loaded|ksu_bundled' kernel/core/init.c; then
+      echo "[FAIL] legacy symbols remain in init.c"; exit 1
     fi
     [ "$(grep -c 'susfs_init();' kernel/core/init.c)" = 1 ] || { echo "[FAIL] susfs_init() count != 1"; exit 1; }
     [ "$(grep -c 'ksu_file_wrapper_init();' kernel/core/init.c)" = 1 ] || { echo "[FAIL] file_wrapper_init count != 1"; exit 1; }
+    grep -q 'ksu_handle_execveat_ksud(int \*fd' kernel/runtime/ksud_integration.c || { echo "[FAIL] new execveat signature not found"; exit 1; }
+    grep -q '#include "hook/tp_marker.h"' kernel/hook/setuid_hook.c && { echo "[FAIL] tp_marker.h still present"; exit 1; } || true
+    grep -q 'reset_avc_cache();' kernel/selinux/rules.c || { echo "[FAIL] reset_avc_cache() not found in rules.c"; exit 1; }
     echo "[OK] SUSFS enable-patch applied to $D"
   ) || return 1
 }
@@ -471,9 +688,9 @@ elif [ "$KSU_TYPE" = "sksu" ]; then
   echo "${_sksu_ver:-}" > "$WORK_DIR/sksu_version.txt"
   cd ..
 
-  # HEAD patches expect KSU preinit, pinned to SKSU_TAG_PIN or v4.3.0-r2
+  # HEAD patches expect KSU preinit, pinned to SKSU_TAG_PIN or v4.3.0-r2; SUSFS floats to HEAD
   git clone -b gki-android13-5.15 https://gitlab.com/simonpunk/susfs4ksu.git
-  git -C susfs4ksu checkout -q 2ad2973 || { echo "[ERROR] susfs4ksu pin 2ad2973 not found"; exit 1; }
+
   SUSFS_COMMIT=$(git -C susfs4ksu rev-parse --short HEAD 2>/dev/null || echo "unknown")
   echo "SUSFS_COMMIT=$SUSFS_COMMIT" >> "${GITHUB_ENV:-/dev/null}"
   echo "[OK] SUSFS commit: $SUSFS_COMMIT"

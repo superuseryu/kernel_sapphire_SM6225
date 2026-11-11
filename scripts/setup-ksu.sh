@@ -311,116 +311,144 @@ def sub(t, old, new, label):
     assert n == 1, f"[FAIL] init.c anchor matched {n}x: {label}"
     return t.replace(old, new)
 
+# hunk3: remove syscall_hook.h, add setuid_hook.h + sucompat.h
 t = sub(t,
-    '#include "feature/module_blacklist.h"\n',
-    '#include "feature/module_blacklist.h"\n#include "hook/setuid_hook.h"\n#include "feature/sucompat.h"\n',
-    "add setuid_hook/sucompat includes")
+    '#include "selinux/selinux.h"\n#include "hook/syscall_hook.h"\n#include "feature/adb_root.h"\n',
+    '#include "selinux/selinux.h"\n#include "feature/adb_root.h"\n#include "hook/setuid_hook.h"\n#include "feature/sucompat.h"\n',
+    "hunk3: includes")
 
+# hunk5: remove ksu_bundled
 t = sub(t,
-    '    ksu_syscall_hook_init();\n\n    // Block modules early, before vendor modules are loaded in second stage.\n    ksu_module_blacklist_init();\n',
-    '#ifdef CONFIG_KSU_SUSFS\n    susfs_init();\n#endif // #ifdef KSU_SUSFS\n\n    ksu_module_blacklist_init();\n',
-    "inject susfs_init + remove syscall_hook_init")
+    '\n#ifdef MODULE\nbool ksu_bundled = false;\nmodule_param_named(bundled, ksu_bundled, bool, 0);\n#endif\n\n',
+    '\n',
+    "hunk5: ksu_bundled")
 
-old7 = ('    ksu_supercalls_init();\n'
-        '    ksu_app_profile_init();\n'
-        '    ksu_extension_init();\n'
-        '    ksu_extension_register_all();\n'
-        '\n'
-        '    if (ksu_late_loaded) {\n'
-        '        pr_info("late load mode, skipping kprobe hooks\\n");\n'
-        '\n'
-        '        apply_kernelsu_rules();\n'
-        '        cache_sid();\n'
-        '        setup_ksu_cred();\n'
-        '        // Grant current process (ksud late-load) root\n'
-        '        // with KSU SELinux domain before enforcing SELinux, so it\n'
-        '        // can continue to access /data/app etc. after enforcement.\n'
-        '        escape_to_root_for_init();\n'
-        '\n'
-        '        ksu_allowlist_init();\n'
-        '        ksu_load_allow_list();\n'
-        '        ksu_dynamic_manager_load();\n'
-        '\n'
-        '        ksu_syscall_hook_manager_init();\n'
-        '\n'
-        '        ksu_throne_tracker_init();\n'
-        '        ksu_observer_init();\n'
-        '        ksu_file_wrapper_init();\n'
-        '\n'
-        '        ksu_boot_completed = true;\n'
-        '        track_throne(false);\n'
-        '\n'
-        '        ksu_avc_spoof_late_init();\n'
-        '        ksu_feature_apply_forced();\n'
-        '        ksu_extension_apply_forced();\n'
-        '\n'
-        '        if (!getenforce()) {\n'
-        '            pr_info("Permissive SELinux, enforcing\\n");\n'
-        '            setenforce(true);\n'
-        '        }\n'
-        '\n'
-        '    } else {\n'
-        '        ksu_syscall_hook_manager_init();\n'
-        '\n'
-        '        ksu_allowlist_init();\n'
-        '\n'
-        '        ksu_throne_tracker_init();\n'
-        '\n'
-        '        ksu_ksud_init();\n'
-        '\n'
-        '        ksu_preinit_init();\n'
-        '\n'
-        '        ksu_file_wrapper_init();\n'
-        '    }\n')
-new7 = ('    ksu_supercalls_init();\n'
-        '\n'
-        '    ksu_sucompat_init();\n'
-        '\n'
-        '    ksu_setuid_hook_init();\n'
-        '\n'
-        '    ksu_sulog_init();\n'
-        '\n'
-        '    ksu_adb_root_init();\n'
-        '\n'
-        '    ksu_selinux_hide_init();\n'
-        '\n'
-        '    ksu_shell_su_adb_only_init();\n'
-        '\n'
-        '    ksu_allowlist_init();\n'
-        '\n'
-        '    ksu_throne_tracker_init();\n'
-        '\n'
-        '    ksu_ksud_init();\n'
-        '\n'
-        '    ksu_preinit_init();\n'
-        '\n'
-        '    ksu_file_wrapper_init();\n')
-t = sub(t, old7, new7, "flatten late_loaded branch")
+# hunk7a: remove syscall_hook_init, inject susfs_init
+t = sub(t,
+    '    ksu_syscall_hook_init();\n\n    ksu_feature_init();\n',
+    '#ifdef CONFIG_KSU_SUSFS\n    susfs_init();\n#endif // #ifdef KSU_SUSFS\n\n    ksu_feature_init();\n',
+    "hunk7a: syscall_hook_init -> susfs_init")
 
-old8 = ('    // Phase 1: Stop all hooks first to prevent new callbacks\n'
-        '    ksu_syscall_hook_manager_exit();\n'
-        '\n'
-        '    ksu_supercalls_exit();\n'
-        '\n'
-        '    if (!ksu_late_loaded) {\n'
-        '        ksu_ksud_exit();\n'
-        '        ksu_preinit_exit();\n'
-        '    }\n')
-new8 = ('    ksu_supercalls_exit();\n'
-        '\n'
-        '    ksu_ksud_exit();\n'
-        '\n'
-        '    ksu_preinit_exit();\n')
-t = sub(t, old8, new8, "cleanup exit")
+# hunk7b: flatten init sequence (remove late_loaded branch)
+old7b = (
+    "    ksu_sulog_init();\n"
+    "    ksu_adb_root_init();\n"
+    "    ksu_lsm_hook_init();\n"
+    "    ksu_selinux_hide_init();\n"
+    "    ksu_avc_spoof_init();\n"
+    "    ksu_shell_su_adb_only_init();\n"
+    "\n"
+    "    ksu_supercalls_init();\n"
+    "    ksu_app_profile_init();\n"
+    "    ksu_extension_init();\n"
+    "    ksu_extension_register_all();\n"
+    "\n"
+    "    if (ksu_late_loaded) {\n"
+    "        pr_info(\"late load mode, skipping kprobe hooks\\n\");\n"
+    "\n"
+    "        apply_kernelsu_rules();\n"
+    "        cache_sid();\n"
+    "        setup_ksu_cred();\n"
+    "\n"
+    "        // Grant current process (ksud late-load) root\n"
+    "        // with KSU SELinux domain before enforcing SELinux, so it\n"
+    "        // can continue to access /data/app etc. after enforcement.\n"
+    "        escape_to_root_for_init();\n"
+    "\n"
+    "        ksu_allowlist_init();\n"
+    "        ksu_load_allow_list();\n"
+    "        ksu_dynamic_manager_load();\n"
+    "\n"
+    "        ksu_syscall_hook_manager_init();\n"
+    "\n"
+    "        ksu_throne_tracker_init();\n"
+    "        ksu_observer_init();\n"
+    "        ksu_file_wrapper_init();\n"
+    "\n"
+    "        ksu_boot_completed = true;\n"
+    "        track_throne(false);\n"
+    "\n"
+    "        ksu_avc_spoof_late_init();\n"
+    "        ksu_feature_apply_forced();\n"
+    "        ksu_extension_apply_forced();\n"
+    "\n"
+    "        if (!getenforce()) {\n"
+    "            pr_info(\"Permissive SELinux, enforcing\\n\");\n"
+    "            setenforce(true);\n"
+    "        }\n"
+    "\n"
+    "    } else {\n"
+    "        ksu_syscall_hook_manager_init();\n"
+    "\n"
+    "        ksu_allowlist_init();\n"
+    "\n"
+    "        ksu_throne_tracker_init();\n"
+    "\n"
+    "        ksu_ksud_init();\n"
+    "\n"
+    "        ksu_preinit_init();\n"
+    "\n"
+    "        ksu_file_wrapper_init();\n"
+    "    }\n"
+    "\n"
+    "#ifdef MODULE\n"
+    "#ifndef CONFIG_KSU_DEBUG\n"
+    "    kobject_del(&THIS_MODULE->mkobj.kobj);\n"
+    "#endif\n"
+    "#endif\n"
+)
+new7b = (
+    "    ksu_supercalls_init();\n"
+    "\n"
+    "    ksu_sucompat_init();\n"
+    "\n"
+    "    ksu_setuid_hook_init();\n"
+    "\n"
+    "    ksu_sulog_init();\n"
+    "\n"
+    "    ksu_adb_root_init();\n"
+    "\n"
+    "    ksu_selinux_hide_init();\n"
+    "\n"
+    "    ksu_shell_su_adb_only_init();\n"
+    "\n"
+    "    ksu_allowlist_init();\n"
+    "\n"
+    "    ksu_throne_tracker_init();\n"
+    "\n"
+    "    ksu_ksud_init();\n"
+    "\n"
+    "    ksu_preinit_init();\n"
+    "\n"
+    "    ksu_file_wrapper_init();\n"
+    "\n"
+)
+t = sub(t, old7b, new7b, "hunk7b: flatten init")
+
+# hunk8: flatten exit
+t = sub(t,
+    "    // Phase 1: Stop all hooks first to prevent new callbacks\n"
+    "    ksu_syscall_hook_manager_exit();\n"
+    "\n"
+    "    ksu_supercalls_exit();\n"
+    "\n"
+    "    if (!ksu_late_loaded) {\n"
+    "        ksu_ksud_exit();\n"
+    "        ksu_preinit_exit();\n"
+    "    }\n",
+    "    ksu_supercalls_exit();\n"
+    "\n"
+    "    ksu_ksud_exit();\n"
+    "\n"
+    "    ksu_preinit_exit();\n",
+    "hunk8: flatten exit")
 
 open(p, "w").write(t)
 print("[OK] init.c adapted")
 INNER
 
     # --- setuid_hook.c ---
-    # Apply rej first (while tp_marker.h context still exists), then strip tp_marker.h
-    patch -p0 --forward --no-backup-if-mismatch < kernel/hook/setuid_hook.c.rej \
-      || { echo "[FAIL] setuid_hook.c.rej did not apply"; exit 1; }
+    # Strip tp_marker.h first, then apply rej with -p1 from SukiSU-Ultra root
     python3 - <<'INNER'
 p = "kernel/hook/setuid_hook.c"
 t = open(p).read()
@@ -428,8 +456,11 @@ old = '#include "hook/tp_marker.h"\n'
 n = t.count(old)
 assert n == 1, f"[FAIL] tp_marker anchor matched {n}x"
 open(p, "w").write(t.replace(old, ""))
-print("[OK] setuid_hook.c adapted")
+print("[OK] setuid_hook.c tp_marker stripped")
 INNER
+    patch -p1 --forward --no-backup-if-mismatch < "../$P" 2>/dev/null || true
+    [ ! -f kernel/hook/setuid_hook.c.rej ] \
+      || { echo "[FAIL] setuid_hook.c.rej still present after re-apply"; exit 1; }
 
     # --- allowlist.c ---
     python3 - <<'INNER'

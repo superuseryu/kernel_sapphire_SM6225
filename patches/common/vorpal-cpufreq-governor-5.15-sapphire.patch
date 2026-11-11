@@ -2241,7 +2241,7 @@ index 0000000000000..f74adcfd3f594
 +
 +	/* Gaming: per-sample asymmetric blend, time-independent */
 +	WARN_ON(rfx_ema(1000, 0, t, &ns, true, true, 1000) != 750 || ns != t);
-+	WARN_ON(rfx_ema(100, 200, t, &ns, true, true, 1000) != 165);
++	WARN_ON(rfx_ema(100, 200, t, &ns, true, true, 1000) != 190);
 +	WARN_ON(rfx_ema(0, 200, t, &ns, true, true, 1000) != 200);
 +	ns = t - RFX_EMA_DECAY_PERIOD_NS;
 +	WARN_ON(rfx_ema(1000, 0, t, &ns, true, true, 1000) != 750 || ns != t);

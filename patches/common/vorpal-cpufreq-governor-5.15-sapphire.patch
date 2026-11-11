@@ -40,7 +40,7 @@ index c63ab3736d761..0e0994cb66ab4 100644
 +obj-$(CONFIG_CPU_FREQ_GOV_VORPAL)	+= cpufreq_vorpal.o
 diff --git a/drivers/cpufreq/cpufreq_vorpal.c b/drivers/cpufreq/cpufreq_vorpal.c
 new file mode 100644
-index 0000000000000..420bd16d24bee
+index 0000000000000..f74adcfd3f594
 --- /dev/null
 +++ b/drivers/cpufreq/cpufreq_vorpal.c
 @@ -0,0 +1,2434 @@
@@ -197,14 +197,14 @@ index 0000000000000..420bd16d24bee
 +#define RFX_D_LIGHT_EVAL_US		60000
 +#define RFX_D_ENERGY_AWARE		1
 +#define RFX_D_ENERGY_AWARE_MIN_PCT	0
-+#define RFX_D_PARK_EXIT_PCT		8	/* SM6225: lowered from 20 for faster park exit */
-+#define RFX_D_PARK_EXIT_EVALS		1	/* SM6225: single eval exit for frame responsiveness */
++#define RFX_D_PARK_EXIT_PCT		20
++#define RFX_D_PARK_EXIT_EVALS		2
 +#define RFX_D_TOUCH_WINDOW_MS		48
 +
 +/* Standby / prolonged quiescence threshold (3.5s without touch in daily mode) */
 +#define RFX_D_STANDBY_QUIET_NS		((u64)3500 * NSEC_PER_MSEC)
 +
-+#define RFX_EMA_DECAY_PERIOD_NS		125000	/* SM6225: faster EMA for frame-time responsiveness */
++#define RFX_EMA_DECAY_PERIOD_NS		250000
 +
 +#define RFX_EMA_DAILY_DIVISOR		4
 +

@@ -7,7 +7,7 @@ MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
 
-- mm/page_alloc.c: watermark_scale_factor default 10 -> 30; wider
+- mm/page_alloc.c: watermark_scale_factor default 10 -> 125; wider
   watermark gap reduces kswapd wakeup frequency on sapphire's low-RAM
   profile, trading slightly higher baseline RSS headroom for fewer
   reclaim storms
@@ -15,6 +15,8 @@ Content-Transfer-Encoding: 8bit
   same rationale as swappiness lock — prevents ROM init.rc from
   overwriting our tuned default at boot
 - extra2 kept as SYSCTL_THREE_THOUSAND; upper ceiling unchanged
+- mm/page_alloc.c: watermark_boost_factor default 15000 -> 0; disables
+  proactive watermark boost entirely, pairs with boost-clamp patch
 - No upstream reference: wrapper-repo tuning, no Linux origin
 
 Assisted-by: Claude:claude-sonnet-4-6
@@ -38,18 +40,17 @@ index e20878716253..f9e5f1ce49a6 100644
  		.extra1		= SYSCTL_ONE,
  		.extra2		= SYSCTL_THREE_THOUSAND,
 diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index a5fb0cedb953..6ab27246ceb1 100644
+index de344d7c785b1..2193f377e7c36 100644
 --- a/mm/page_alloc.c
 +++ b/mm/page_alloc.c
-@@ -435,7 +435,7 @@ compound_page_dtor * const compound_page_dtors[NR_COMPOUND_DTORS] = {
+@@ -437,8 +437,8 @@ compound_page_dtor * const compound_page_dtors[NR_COMPOUND_DTORS] = {
+ 
  int min_free_kbytes = 1024;
  int user_min_free_kbytes = -1;
- int watermark_boost_factor __read_mostly = 15000;
+-int watermark_boost_factor __read_mostly = 15000;
 -int watermark_scale_factor = 10;
-+int watermark_scale_factor = 30;
++int watermark_boost_factor __read_mostly = 0;
++int watermark_scale_factor = 125;
  
  static unsigned long nr_kernel_pages __initdata;
  static unsigned long nr_all_pages __initdata;
--- 
-2.34.1
-

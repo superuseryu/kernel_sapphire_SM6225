@@ -1,0 +1,18 @@
+diff --git a/drivers/block/zram/zram_drv.c b/drivers/block/zram/zram_drv.c
+index ddd32c96a6911..85c835fac56c6 100644
+--- a/drivers/block/zram/zram_drv.c
++++ b/drivers/block/zram/zram_drv.c
+@@ -1731,9 +1731,10 @@ static ssize_t disksize_store(struct device *dev,
+ 	struct zram *zram = dev_to_zram(dev);
+ 	int err;
+ 
+-	disksize = memparse(buf, NULL);
+-	if (!disksize)
+-		return -EINVAL;
++	/* Hardcode zRAM size to 12 GB, ignore userspace input */
++	disksize = PAGE_ALIGN((u64)1024 * 1024 * 1024 * 12);
++	pr_info("zram: forcing disksize to %llu bytes (%llu GiB)\n",
++		disksize, disksize >> 30);
+ 
+ 	down_write(&zram->init_lock);
+ 	if (init_done(zram)) {

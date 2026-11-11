@@ -7,8 +7,8 @@ MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
 
-- mm/vmscan.c: vm_swappiness default 60 -> 160 (aggressively prefer
-  swap to avoid OOM on low-RAM sapphire)
+- mm/vmscan.c: vm_swappiness default 60 -> 180 (above-100 reclaims anon pages into
+  fast zRAM rather than drop pagecache; optimal for 8GB + zRAM 12GB)
 - kernel/sysctl.c: swappiness sysctl mode 0644 -> 0444; prevents
   init.rc from the ROM overwriting our default at boot via
   'write /proc/sys/vm/swappiness', root sysctl writes are checked
@@ -44,7 +44,7 @@ index ab19acc0731d..e20878716253 100644
  		.extra1		= SYSCTL_ZERO,
  		.extra2		= SYSCTL_TWO_HUNDRED,
 diff --git a/mm/vmscan.c b/mm/vmscan.c
-index ace21016e7c1..935ac6a848fb 100644
+index 4fbbc54f9ecfe..a224e68184437 100644
 --- a/mm/vmscan.c
 +++ b/mm/vmscan.c
 @@ -191,7 +191,7 @@ struct scan_control {
@@ -52,10 +52,7 @@ index ace21016e7c1..935ac6a848fb 100644
   * From 0 .. 200.  Higher means more swappy.
   */
 -int vm_swappiness = 60;
-+int vm_swappiness = 160;
++int vm_swappiness = 180;
  
  static void set_task_reclaim_state(struct task_struct *task,
  				   struct reclaim_state *rs)
--- 
-2.34.1
-

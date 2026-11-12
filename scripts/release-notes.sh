@@ -49,7 +49,7 @@ BODY="${BODY}> **ZRAM module is universal** — one \`seiran-core.zip\` works ac
 
 BODY="${BODY}**Commit:** [\`${SHORT_SHA}\`](${COMMIT_URL})"$'\n'
 BODY="${BODY}📋 **Per-build details:** [Run #${GITHUB_RUN_NUMBER} summary](${RUN_URL})"$'\n'
-BODY="${BODY}> Full build logs in \`build-log-run*.zip\` below."
+BODY="${BODY}> Full build logs in \`build-audit-logs-*.zip\` below."
 
 {
   echo "RELEASE_BODY<<EOREL"

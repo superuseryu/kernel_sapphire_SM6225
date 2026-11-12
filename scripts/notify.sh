@@ -91,6 +91,15 @@ if [ "$MODE" = "success" ]; then
     _tg_doc "$ZIP" "$(basename "$ZIP") — ${SIZE_MB} MB"
   done
 
+  # Send audit log
+  if [ -n "${LOG_AUDIT_ZIP:-}" ] && [ -f "${LOG_AUDIT_ZIP:-}" ]; then
+    if (( $(echo "${LOG_AUDIT_SIZE_MB:-0} < 45" | bc -l) )); then
+      _tg_doc "$LOG_AUDIT_ZIP" "📋 $(basename "$LOG_AUDIT_ZIP") — ${LOG_AUDIT_SIZE_MB} MB"
+    else
+      _tg_msg "📋 Log too large (${LOG_AUDIT_SIZE_MB} MB) — grab from <a href='${RELEASE_LINK}'>release</a>."
+    fi
+  fi
+
 # ---------------------------------------------------------------------------
 # variant-failure — called from build-kernel.yml when a single variant fails
 # ---------------------------------------------------------------------------

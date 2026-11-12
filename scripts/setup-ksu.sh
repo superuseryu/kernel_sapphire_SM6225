@@ -115,17 +115,22 @@ _fix_susfs_log_rl_stubs() {
 }
 
 _pin_susfs_lvc() {
-  # kernel-release-spoof sets VERSION=6 PATCHLEVEL=12, so susfs.c took 6.x branches.
-  # Pin LINUX_VERSION_CODE after the last include, same pattern as nomount.h.
+  # kernel-release-spoof sets VERSION=6 PATCHLEVEL=12, so susfs took 6.x branches.
+  # Pin LINUX_VERSION_CODE in fs/susfs.c and include/linux/susfs.h.
   local F="fs/susfs.c"
-  [ -f "$F" ] || return 0
-  grep -q "sapphire: pin LINUX_VERSION_CODE" "$F" && return 0
-  if [ "$(grep -c '^#include "mount.h"$' "$F")" != 1 ]; then
-    echo "[FAIL] _pin_susfs_lvc: expected exactly 1 mount.h include in $F"
-    return 1
+  if [ -f "$F" ] && ! grep -q "sapphire: pin LINUX_VERSION_CODE" "$F"; then
+    if [ "$(grep -c '^#include "mount.h"$' "$F")" = 1 ]; then
+      sed -i '/^#include "mount.h"$/a /* sapphire: pin LINUX_VERSION_CODE to real 5.15.220 (spoofed to 6.12) */\n#undef LINUX_VERSION_CODE\n#define LINUX_VERSION_CODE KERNEL_VERSION(5, 15, 220)' "$F"
+      echo "[OK] susfs.c: LINUX_VERSION_CODE pinned to 5.15.220"
+    fi
   fi
-  sed -i '/^#include "mount.h"$/a /* sapphire: pin LINUX_VERSION_CODE to real 5.15.220 (spoofed to 6.12) */\n#undef LINUX_VERSION_CODE\n#define LINUX_VERSION_CODE KERNEL_VERSION(5, 15, 220)' "$F"
-  echo "[OK] susfs.c: LINUX_VERSION_CODE pinned to 5.15.220"
+  local H="include/linux/susfs.h"
+  if [ -f "$H" ] && ! grep -q "sapphire: pin LINUX_VERSION_CODE" "$H"; then
+    if [ "$(grep -c '^#include <linux/version.h>$' "$H")" = 1 ]; then
+      sed -i '/^#include <linux\/version\.h>$/a /* sapphire: pin LINUX_VERSION_CODE to real 5.15.220 (spoofed to 6.12) */\n#undef LINUX_VERSION_CODE\n#define LINUX_VERSION_CODE KERNEL_VERSION(5, 15, 220)' "$H"
+      echo "[OK] susfs.h: LINUX_VERSION_CODE pinned to 5.15.220"
+    fi
+  fi
 }
 
 _patch_susfs_def_h() {
@@ -288,6 +293,7 @@ _pin_sksu_lvc() {
   # Pin LINUX_VERSION_CODE to 5.15.220 immediately after every <linux/version.h>
   # include in the SukiSU-Ultra tree so the entire unity build stays on 5.15.
   _pin_lvc_after "SukiSU-Ultra/kernel/kernel_includes.h" '#include <linux/version.h>' || return 1
+  _pin_lvc_before "SukiSU-Ultra/kernel/kernel_includes.h" '// versioned / conditional' || return 1
   _pin_lvc_after "SukiSU-Ultra/kernel/kernel_includes.h" '#include <linux/lsm_hooks.h>' || return 1
   _pin_lvc_after "SukiSU-Ultra/kernel/include/arch.h" '#include <linux/version.h>' || return 1
   _pin_lvc_after "SukiSU-Ultra/kernel/manager/pkg_observer_compat.h" '#include <linux/version.h>' || return 1

@@ -11,6 +11,7 @@ on:
       defconfig:     { type: string, required: true }
       build_type:    { type: string, required: true }   # stable | testing
       notify:        { type: boolean, default: true }
+      use_ccache:    { type: boolean, default: false }
       ksun_tag_pin:  { type: string, required: false, default: "" }  # verify-gate only
       sksu_tag_pin:  { type: string, required: false, default: "" }  # verify-gate only
 
@@ -45,29 +46,29 @@ jobs:
         run: bash scripts/fix-source-warnings.sh "${{ env.KERNEL_SRC }}"
 
       - name: "Configure ccache"
-        if: inputs.build_type == 'stable'
+        if: inputs.use_ccache == true
         run: |
           sudo apt-get install -y ccache
           echo "CCACHE_DIR=$HOME/.ccache"                                                                          >> $GITHUB_ENV
-          echo "CCACHE_MAXSIZE=1G"                                                                                 >> $GITHUB_ENV
+          echo "CCACHE_MAXSIZE=5G"                                                                                 >> $GITHUB_ENV
           echo "CCACHE_COMPILERCHECK=content"                                                                      >> $GITHUB_ENV
           echo "CCACHE_DIRECT=true"                                                                                >> $GITHUB_ENV
-          echo "CCACHE_NOHASHDIR=true"                                                                             >> $GITHUB_ENV
           echo "CCACHE_BASEDIR=${{ github.workspace }}"                                                            >> $GITHUB_ENV
           echo "CCACHE_IGNOREOPTIONS=--sysroot*"                                                                   >> $GITHUB_ENV
           echo "CCACHE_COMPRESSION=true"                                                                           >> $GITHUB_ENV
-          echo "CCACHE_COMPRESSLEVEL=3"                                                                            >> $GITHUB_ENV
-          echo "CCACHE_SLOPPINESS=file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale" >> $GITHUB_ENV
+          echo "CCACHE_COMPRESSLEVEL=5"                                                                            >> $GITHUB_ENV
+          echo "CCACHE_IS_KERNEL_COMPILING=true"                                                                   >> $GITHUB_ENV
+          echo "CCACHE_SLOPPINESS=include_file_mtime,include_file_ctime,time_macros"                                >> $GITHUB_ENV
 
       - name: "Restore ccache"
-        if: inputs.build_type == 'stable'
+        if: inputs.use_ccache == true
         id: ccache-restore
         uses: actions/cache/restore@v4
         with:
           path: ~/.ccache
-          key: ccache-${{ inputs.source_type }}-${{ inputs.ksu_type }}-${{ hashFiles('sources/source-pins.json') }}
+          key: ccache-${{ runner.os }}-${{ inputs.source_type }}-${{ inputs.ksu_type }}-${{ github.sha }}
           restore-keys: |
-            ccache-${{ inputs.source_type }}-${{ inputs.ksu_type }}-
+            ccache-${{ runner.os }}-${{ inputs.source_type }}-${{ inputs.ksu_type }}-
 
       - name: "Setup toolchain"
         env:
@@ -153,16 +154,17 @@ jobs:
           KSU_TYPE:     ${{ inputs.ksu_type }}
           DEFCONFIG:    ${{ inputs.defconfig }}
           VARIANT:      ${{ inputs.variant_name }}
+          USE_CCACHE:   ${{ inputs.use_ccache == true }}
         run: |
           set -o pipefail
           bash scripts/build.sh
 
       - name: "Save ccache"
-        if: inputs.build_type == 'stable' && steps.ccache-restore.outputs.cache-hit != 'true'
+        if: inputs.use_ccache == true && steps.ccache-restore.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.ccache
-          key: ccache-${{ inputs.source_type }}-${{ inputs.ksu_type }}-${{ hashFiles('sources/source-pins.json') }}
+          key: ccache-${{ runner.os }}-${{ inputs.source_type }}-${{ inputs.ksu_type }}-${{ github.sha }}
 
       - name: "Verify kernel"
         run: |

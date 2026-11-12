@@ -19,6 +19,10 @@ on:
         description: "Nuke ALL existing assets on this release before uploading (opt-in)"
         type: boolean
         default: true
+      use_ccache:
+        description: "Enable ccache compiler acceleration (experimental / test only)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -72,6 +76,7 @@ jobs:
       defconfig:     ${{ matrix.variant.defconfig }}
       build_type:    ${{ inputs.build_type || 'stable' }}
       notify:        ${{ inputs.notify == true }}
+      use_ccache:    ${{ inputs.use_ccache == true }}
     secrets: inherit
 
   release:
@@ -86,6 +91,7 @@ jobs:
       workflow_type: compat
       nuke_release: ${{ inputs.nuke_release }}
       notify: ${{ inputs.notify == true }}
+      use_ccache: ${{ inputs.use_ccache == true }}
     secrets: inherit
 
   notify-failure:

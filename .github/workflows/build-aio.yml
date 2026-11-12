@@ -5,8 +5,6 @@ env:
 
 
 on:
-  schedule:
-    - cron: '0 0 */5 * *'   # every 5 days — keeps GHA cache alive (evicts at 7d)
   workflow_dispatch:
     inputs:
       zip_mode:
@@ -29,6 +27,10 @@ on:
         default: false
       fast_test:
         description: "Fast boot test — GKI-KSU-Next only, no release"
+        type: boolean
+        default: false
+      use_ccache:
+        description: "Enable ccache compiler acceleration (experimental / test only)"
         type: boolean
         default: false
 
@@ -71,6 +73,7 @@ jobs:
       defconfig:     ${{ matrix.variant.defconfig }}
       build_type:    ${{ inputs.build_type || 'stable' }}
       notify:        ${{ inputs.notify == true }}
+      use_ccache:    ${{ inputs.use_ccache == true }}
     secrets: inherit
 
   build:
@@ -112,12 +115,13 @@ jobs:
       defconfig:     ${{ matrix.variant.defconfig }}
       build_type:    ${{ inputs.build_type || 'stable' }}
       notify:        ${{ inputs.notify == true }}
+      use_ccache:    ${{ inputs.use_ccache == true }}
     secrets: inherit
 
   release:
     name: "Package & Release"
     needs: [setup, build]
-    if: success() && github.event_name != 'schedule' && inputs.fast_test != true
+    if: success() && inputs.fast_test != true
     uses: ./.github/workflows/release.yml
     with:
       zip_mode:   ${{ inputs.zip_mode || 'per-variant' }}
@@ -126,6 +130,7 @@ jobs:
       workflow_type: aio
       nuke_release: ${{ inputs.nuke_release }}
       notify: ${{ inputs.notify == true }}
+      use_ccache: ${{ inputs.use_ccache == true }}
     secrets: inherit
 
   notify-failure:
@@ -135,7 +140,6 @@ jobs:
     if: |
       always() &&
       (needs.build.result == 'cancelled' || needs.build-fast.result == 'cancelled') &&
-      github.event_name != 'schedule' &&
       inputs.notify == true
     steps:
       - uses: actions/checkout@v4.2.2

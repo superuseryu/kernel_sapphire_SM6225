@@ -10,6 +10,10 @@ on:
         description: "Send Telegram notifications"
         type: boolean
         default: false
+      use_ccache:
+        description: "Enable ccache compiler acceleration (experimental / test only)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -41,6 +45,7 @@ jobs:
       defconfig:     "gki_defconfig"
       build_type:    "testing"
       notify:        ${{ inputs.notify == true }}
+      use_ccache:    ${{ inputs.use_ccache == true }}
     secrets: inherit
 
   notify:

@@ -27,7 +27,14 @@ fi
 BODY="${BODY}**KSU-Next Manager:** [Dev Build ↗](${KSUN_MANAGER_URL})"$'\n'
 BODY="${BODY}**SukiSU-Ultra Manager:** [${SKSU_TAG:-CI} ↗](${SKSU_MANAGER_URL})"$'\n'
 BODY="${BODY}**SUSFS module:** [${SUSFS_VERSION}](${SUSFS_MODULE_URL})"$'\n'
-BODY="${BODY}**Kernel base:** \`6.12.25-android16\`"$'\n\n'
+BODY="${BODY}**Kernel base:** \`6.12.25-android16\`"$'\n'
+
+if [ "${USE_CCACHE:-false}" = "true" ]; then
+  BODY="${BODY}**Compiler:** Neutron Clang (Ccache Accelerated)"$'\n\n'
+else
+  BODY="${BODY}**Compiler:** Neutron Clang (Clean Build)"$'\n\n'
+fi
+
 BODY="${BODY}**ZRAM Multi-Comp module:** \`seiran-core.zip\` — attached below & sent via [Telegram](https://t.me/tmplogchat)"$'\n\n'
 
 if [ "$WORKFLOW_TYPE" = "compat" ]; then

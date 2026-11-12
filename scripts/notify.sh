@@ -75,9 +75,16 @@ if [ "$MODE" = "success" ]; then
   MSG="${MSG}Date: ${DATE_STR}%0A"
   MSG="${MSG}Tag: <code>${DISPLAY_TAG}</code>%0A"
   MSG="${MSG}%0A"
+  if [ "${USE_CCACHE:-false}" = "true" ]; then
+    COMPILER_DESC="Ccache (Accelerated)"
+  else
+    COMPILER_DESC="Pure Clang (Clean)"
+  fi
+
   MSG="${MSG}KSU-Next: <code>${KSUN_TAG:-unknown}</code>%0A"
   MSG="${MSG}SukiSU-Ultra: <code>${SKSU_TAG:-unknown}</code>%0A"
   MSG="${MSG}SUSFS: <code>${DISPLAY_SUSFS}</code>%0A"
+  MSG="${MSG}Compiler: <code>${COMPILER_DESC}</code>%0A"
   MSG="${MSG}%0A"
   MSG="${MSG}<a href='${RELEASE_LINK}'>Release</a>%0A"
   MSG="${MSG}<a href='${RUN_URL}'>Logs</a>"

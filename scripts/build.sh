@@ -16,7 +16,14 @@ export KBUILD_BUILD_USER="${KBUILD_BUILD_USER:-superuseryu}"
 export KBUILD_BUILD_HOST="${KBUILD_BUILD_HOST:-github}"
 export PATH="${CLANG_DIR}/bin:$PATH"
 
-if command -v ccache &>/dev/null; then _CC="ccache clang"; else _CC="clang"; fi
+if [ "${USE_CCACHE:-false}" = "true" ] && command -v ccache &>/dev/null; then
+  echo "[CCACHE] Compiler acceleration ENABLED"
+  _CC="ccache clang"
+  ccache -z 2>/dev/null || true
+else
+  echo "[CCACHE] Compiler acceleration DISABLED (clean pure clang build)"
+  _CC="clang"
+fi
 
 MAKE_FLAGS=(
   -j$(nproc)
@@ -183,5 +190,9 @@ if [ -n "$RTL8188GU_KO" ]; then
 fi
 
 DURATION=$(( $(date +%s) - START ))
+if [ "${USE_CCACHE:-false}" = "true" ] && command -v ccache &>/dev/null; then
+  echo "[CCACHE] Statistics:"
+  ccache -s 2>/dev/null || true
+fi
 echo "✅ Build done in $((DURATION/60))m $((DURATION%60))s"
 echo "duration=$DURATION" >> "${GITHUB_OUTPUT:-/dev/null}"

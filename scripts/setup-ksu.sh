@@ -304,7 +304,7 @@ _apply_sksu_susfs_ksu() {
     fi
 
     # --- init.c ---
-    python3 - <<'INNER'
+    python3 - <<'INNER' || exit 1
 p = "kernel/core/init.c"
 t = open(p).read()
 def sub(t, old, new, label):
@@ -460,7 +460,7 @@ print("[OK] init.c adapted")
 INNER
 
     # --- setuid_hook.c ---
-    python3 - <<'INNER'
+    python3 - <<'INNER' || exit 1
 import sys
 p = "kernel/hook/setuid_hook.c"
 t = open(p).read()
@@ -602,7 +602,7 @@ print("[OK] setuid_hook.c adapted")
 INNER
 
     # --- allowlist.c ---
-    python3 - <<'INNER'
+    python3 - <<'INNER' || exit 1
 p = "kernel/policy/allowlist.c"
 t = open(p).read()
 old = ('    if (likely(ksu_is_manager_appid_valid()) && unlikely(ksu_get_manager_appid() == uid % PER_USER_RANGE)) {\n'
@@ -616,7 +616,7 @@ print("[OK] allowlist.c adapted")
 INNER
 
     # --- ksud_integration.c ---
-    python3 - <<'INNER'
+    python3 - <<'INNER' || exit 1
 p = "kernel/runtime/ksud_integration.c"
 t = open(p).read()
 old = ('void ksu_handle_execveat_ksud(const char *path, struct user_arg_ptr *argv)\n'
@@ -717,27 +717,6 @@ open(p, "w").write(t.replace(old, new))
 print("[OK] ksud_integration.c adapted")
 INNER
 
-    # --- rules.c ---
-    python3 - <<'INNER'
-p = "kernel/selinux/rules.c"
-t = open(p).read()
-old = ('    pol->latest_granting = old_pol->latest_granting + 1;\n'
-       '    rcu_assign_pointer(selinux_state.policy, pol);\n'
-       '    synchronize_rcu();\n'
-       '    ksu_destroy_sepolicy(old_pol);\n'
-       '\n'
-       '    reset_avc_cache(pol->latest_granting);\n')
-new = ('    rcu_assign_pointer(selinux_state.policy, pol);\n'
-       '    synchronize_rcu();\n'
-       '    ksu_destroy_sepolicy(old_pol);\n'
-       '\n'
-       '    reset_avc_cache();\n')
-n = t.count(old)
-assert n == 1, f"[FAIL] rules.c anchor matched {n}x"
-open(p, "w").write(t.replace(old, new))
-print("[OK] rules.c adapted")
-INNER
-
     rm -f kernel/core/init.c.rej kernel/hook/setuid_hook.c.rej \
           kernel/policy/allowlist.c.rej kernel/runtime/ksud_integration.c.rej \
           kernel/selinux/rules.c.rej
@@ -773,6 +752,7 @@ _pin_sksu_lvc() {
   _pin_lvc_after "SukiSU-Ultra/kernel/manager/apk_sign.c" '#include <crypto/hash.h>' || return 1
   _pin_lvc_after "SukiSU-Ultra/kernel/manager/pkg_observer.c" '#include "manager/throne_tracker.h"' || return 1
   _pin_lvc_after "SukiSU-Ultra/kernel/selinux/sepolicy.c" '#include "ss/symtab.h"' || return 1
+  _pin_lvc_after "SukiSU-Ultra/kernel/feature/avc_spoof.c" '#include "runtime/ksud_boot.h"' || return 1
 }
 
 _pin_ksun_lvc() {

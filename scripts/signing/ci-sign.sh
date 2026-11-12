@@ -10,6 +10,7 @@ DIR="$(cd "${1:?stage dir}" && pwd)"
 umask 077
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 printf '%s\n' "$SEIRAN_SIGN_KEY" > "$T/key.pem"
+umask 022
 VBIN="${SEIRAN_VERIFY_BIN:-}"
 if [ -z "$VBIN" ]; then
   VBIN="$T/verify"

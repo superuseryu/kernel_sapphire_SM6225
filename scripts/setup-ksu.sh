@@ -379,7 +379,11 @@ elif [ "$KSU_TYPE" = "sksu" ]; then
   git fetch --tags 2>/dev/null || true
   SKSU_TAG=$(git describe --tags --exact-match HEAD 2>/dev/null | tr -d '[:space:]')
   SKSU_TAG=${SKSU_TAG:-$(git describe --tags --abbrev=0 HEAD 2>/dev/null | tr -d '[:space:]')}
-  SKSU_TAG=${SKSU_TAG:-unknown}
+  _sksu_short=$(git rev-parse --short=8 HEAD 2>/dev/null || echo "")
+  if [ -z "$SKSU_TAG" ] || [ "$SKSU_TAG" = "unknown" ]; then
+    _latest_tag=$(git tag -l "v*" --sort=-v:refname 2>/dev/null | head -1 | tr -d '[:space:]')
+    SKSU_TAG="${_latest_tag:-v4.3.0-r2}-${_sksu_short}@builtin"
+  fi
   SKSU_SHA=$(git rev-parse HEAD)
   echo "SKSU_TAG=$SKSU_TAG"  >> "${GITHUB_ENV:-/dev/null}"
   echo "SKSU_SHA=$SKSU_SHA"  >> "${GITHUB_ENV:-/dev/null}"
@@ -387,7 +391,13 @@ elif [ "$KSU_TYPE" = "sksu" ]; then
   echo "$SKSU_SHA"                > "$WORK_DIR/sksu_sha.txt"
   _sksu_ver=$(grep -rh "^#define KSU_VERSION\b" kernel/ 2>/dev/null \
     | awk 'NR==1{print $NF}' | tr -d '[:space:]')
-  echo "${_sksu_ver:-builtin}" > "$WORK_DIR/sksu_version.txt"
+  if [ -z "$_sksu_ver" ]; then
+    _count=$(git rev-list --count HEAD 2>/dev/null || echo "")
+    if [ -n "$_count" ]; then
+      _sksu_ver=$((40000 + _count - 2815))
+    fi
+  fi
+  echo "${_sksu_ver:-41179}" > "$WORK_DIR/sksu_version.txt"
   cd ..
 
   # Apply SUSFS to kernel tree; SukiSU builtin branch has native SUSFS support

@@ -14,4 +14,5 @@ rm -f SHA256SUMS SHA256SUMS.sig
 find . -type f ! -path '*/.*' ! -name SHA256SUMS ! -name SHA256SUMS.sig -print0 \
   | sort -z | xargs -0 sha256sum > SHA256SUMS
 openssl pkeyutl -sign -rawin -inkey "$KEY" -in SHA256SUMS -out SHA256SUMS.sig
+chmod 644 SHA256SUMS SHA256SUMS.sig "$DIR/seiran-verify/pub.raw"
 echo "[OK] signed $(wc -l < SHA256SUMS) files"
